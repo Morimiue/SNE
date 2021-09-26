@@ -7,7 +7,7 @@ import torch.optim as optim
 import torch.utils.data as Data
 
 from mlp_model import MLPModel as Model
-from data_processor import *
+from utils import *
 
 
 otu_path = './data/train_otu.csv'
