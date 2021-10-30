@@ -79,7 +79,7 @@ def train_model(model, data_loader):
 otu, adj = read_raw_data(otu_path, adj_path)
 sample_num = otu.shape[1]
 
-train_dataset = get_dateset(otu, adj)
+train_dataset = get_coe_dateset(otu, adj)
 
 loader = Data.DataLoader(dataset=train_dataset,
                          batch_size=batch_size, shuffle=True)

@@ -57,7 +57,7 @@ sample_num = otu.shape[1]
 # print(spieces_num)
 # print(sample_num)
 
-test_dataset = get_dateset(otu, adj)
+test_dataset = get_coe_dateset(otu, adj)
 
 loader = Data.DataLoader(dataset=test_dataset,
                          batch_size=batch_size, shuffle=False)

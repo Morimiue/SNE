@@ -21,7 +21,7 @@ def read_raw_data(otu_path, adj_path):
 
 
 # Get dataset
-def get_dateset(otu, adj):
+def get_coe_dateset(otu, adj):
     spieces_num = otu.shape[0]
     sample_num = otu.shape[1]
 
