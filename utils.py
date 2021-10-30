@@ -50,7 +50,7 @@ def get_dateset(otu, adj):
     return Data.TensorDataset(x_train, y_train)
 
 
-# Draw Graph
+# Draw graph
 def draw_graph(G, pos, node_size, node_color):
     nx.draw_networkx_nodes(
         G,
@@ -58,6 +58,41 @@ def draw_graph(G, pos, node_size, node_color):
         alpha=0.9,
         node_size=node_size,
         node_color=node_color,
+        cmap=plt.cm.Wistia,
+        edgecolors='tab:gray',
+    )
+    nx.draw_networkx_edges(
+        G,
+        pos,
+        arrowstyle='-',
+        alpha=0.5,
+    )
+    nx.draw_networkx_edges(
+        G,
+        pos,
+        arrowstyle='-',
+        alpha=0.5,
+        width=7,
+        edge_color='tab:blue',
+    )
+    nx.draw_networkx_labels(
+        G,
+        pos,
+        alpha=0.8,
+        # font_color='whitesmoke'
+    )
+
+    plt.axis('off')
+    plt.show()
+
+
+# Draw raw graph
+def draw_raw_graph(G, pos, node_size, node_color):
+    nx.draw_networkx_nodes(
+        G,
+        pos,
+        alpha=0.9,
+        node_size=node_size,
         cmap=plt.cm.Wistia,
         edgecolors='tab:gray',
     )

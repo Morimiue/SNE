@@ -100,6 +100,7 @@ for i in range(spieces_num):
             G.add_edge(i, j)
 print(G.size())
 pos = nx.drawing.spring_layout(G)
+draw_raw_graph(G, pos, 500, node_color)
 draw_graph(G, pos, node_size, node_color)
 
 G = nx.DiGraph()
