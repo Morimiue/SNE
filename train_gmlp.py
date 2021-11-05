@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data as Data
 
-from gmlp_model import GMLPModel as Model
+from model_gmlp import GMLPModel as Model
 from utils import *
 
 

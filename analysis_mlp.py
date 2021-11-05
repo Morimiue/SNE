@@ -8,7 +8,7 @@ import torch.optim as optim
 import torch.utils.data as Data
 from scipy.stats import spearmanr
 
-from mlp_model import MLPModel as Model
+from model_mlp import MLPModel as Model
 from utils import *
 
 otu_path = './data/otu0.csv'
