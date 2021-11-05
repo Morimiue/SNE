@@ -50,6 +50,31 @@ def get_coe_dateset(otu, adj):
     return Data.TensorDataset(x_train, y_train)
 
 
+def get_emb_dateset():
+    for i in range(100):
+        with open(f'./data/otu{i}.csv') as f:
+            reader = csv.reader(f)
+            otu = np.array(list(reader), dtype=np.float32)
+            if i == 0:
+                x_train = otu
+            else:
+                x_train = np.vstack((x_train, otu))
+
+    for i in range(100):
+        with open(f'./data/adj{i}.csv') as f:
+            reader = csv.reader(f)
+            adj = np.array(list(reader), dtype=np.float32)
+            if i == 0:
+                y_train = adj
+            else:
+                y_train = np.vstack((y_train, adj))
+
+    x_train = torch.from_numpy(x_train).float()
+    y_train = torch.from_numpy(y_train).float()
+
+    return Data.TensorDataset(x_train, y_train)
+
+
 # Draw graph
 def draw_graph(G, pos, node_size, node_color):
     nx.draw_networkx_nodes(
