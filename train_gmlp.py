@@ -16,26 +16,28 @@ wtd_adj_path = './data/wtd_adj0.csv'
 model_path = './models/gmlp_model.pth'
 
 batch_size = 20
-epoch_num = 1000
+epoch_num = 1
 learning_rate = 1e-2
 delta = 0.10
 
 is_using_gpu = torch.cuda.is_available()
 is_saving_model = True
 
+class NContrastLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
 
-def Ncontrast(x_dis, adj_label, tau=1):
-    x_dis = torch.exp(x_dis * tau)
-    x_dis_sum = torch.sum(x_dis, 1)
-    x_dis_sum_pos = torch.sum(x_dis * adj_label, 1)
-    loss = -torch.log(x_dis_sum_pos * (x_dis_sum+1e-8)**(-1)).mean()
-    return loss
-
+    def forward(self, y_hat: torch.Tensor, y: torch.Tensor, tau: int = 1) -> torch.Tensor:
+        y_hat = torch.exp(y_hat * tau)
+        y_match_sum = torch.sum(y_hat * y, 1)
+        y_sum = torch.sum(y_hat, 1)
+        loss = -torch.log(y_match_sum * (y_sum+1e-8)**(-1)).mean()
+        return loss
 
 # Train model
 def train_model(model, data_loader):
     # criterion = nn.MSELoss()
-    criterion = Ncontrast
+    criterion = NContrastLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     # Train on every epoch
