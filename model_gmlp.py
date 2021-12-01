@@ -4,11 +4,13 @@ import torch.nn.functional as F
 
 
 def get_y_hat(z):
-    b = z.shape[0]
-    y_hat = torch.zeros((b, b))
-    for i in range(b):
-        for j in range(b):
-            y_hat[i, j] = F.cosine_similarity(z[i], z[j], dim=0)
+    y_hat = z@z.T
+    mask = torch.eye(y_hat.shape[0]).cuda()
+    z_sum = torch.sum(z**2, 1).reshape(-1, 1)
+    z_sum = torch.sqrt(z_sum).reshape(-1, 1)
+    z_sum = z_sum @ z_sum.T
+    y_hat = y_hat * (z_sum**(-1))
+    y_hat = (1-mask) * y_hat
     return y_hat
 
 
