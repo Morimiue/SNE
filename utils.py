@@ -6,8 +6,33 @@ import numpy as np
 import pandas as pd
 import torch
 from scipy.sparse import coo_matrix
-from torch.utils.data import TensorDataset
+from torch.utils.data import DataLoader, TensorDataset
 from torch_geometric.data import Data
+
+
+class GMLPDataLoader():
+    def __init__(self, data: Data, batch_size: int, shuffle: bool = False, drop_last: bool = False):
+        self.x = torch.as_tensor(data.x)
+        self.y = torch.as_tensor(coo_matrix((np.ones(data.edge_index.shape[1]), data.edge_index), shape=(
+            data.x.shape[0], data.x.shape[0])).toarray())
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        if drop_last:
+            self.sample_num = len(self.x) // self.batch_size
+        else:
+            self.sample_num = (
+                len(self.x) + self.batch_size - 1) // self.batch_size
+
+    def __iter__(self):
+        for _ in range(2):
+            random_index = torch.as_tensor(np.random.choice(
+                np.arange(len(self.x)), self.batch_size))
+            x_batch = self.x[random_index]
+            y_batch = self.y[random_index, :][:, random_index]
+            yield x_batch, y_batch
+
+    def __len__(self):
+        return self.sample_num
 
 
 # Read data from file
@@ -24,10 +49,10 @@ def read_raw_data(otu_path, adj_path):
 
 
 # Get dataset
-def get_real_dataset(otu_path, adj_path):
+def get_real_dataset():
     samples_df = pd.read_csv('./data/real/samples.csv')
 
-    x = samples_df.values[:, 1:]
+    x = samples_df.values[:, 1:].astype(np.float32)
 
     interactions_df = pd.read_csv('./data/real/interactions.csv')
 
@@ -36,12 +61,13 @@ def get_real_dataset(otu_path, adj_path):
 
     gene_names = samples_df.name.to_list()
 
-    gene1_index = np.array([gene_names.index(i) for i in gene1])
-    gene2_index = np.array([gene_names.index(i) for i in gene2])
+    gene1_index = np.array([gene_names.index(i)
+                           for i in gene1], dtype=np.int32)
+    gene2_index = np.array([gene_names.index(i)
+                           for i in gene2], dtype=np.int32)
 
     # edge_num = len(gene1)
-    # coo = coo_matrix(
-    #     (np.ones(edge_num), (gene1_index, gene2_index)), shape=(edge_num, edge_num))
+    # coo = coo_matrix((np.ones(edge_num), (gene1_index, gene2_index)))
     edge_index = np.vstack((gene1_index, gene2_index))
 
     return Data(x=x, edge_index=edge_index)

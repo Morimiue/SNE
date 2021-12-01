@@ -14,7 +14,7 @@ adj_path = './data/synthetic/adj0.csv'
 wtd_adj_path = './data/synthetic/wtd_adj0.csv'
 model_path = './models/gmlp_model.pth'
 
-batch_size = 20
+batch_size = 32
 epoch_num = 1
 learning_rate = 1e-2
 delta = 0.10
@@ -34,9 +34,8 @@ class NContrastLoss(nn.Module):
         loss = -torch.log(y_match_sum * (y_sum+1e-8)**(-1)).mean()
         return loss
 
+
 # Train model
-
-
 def train_model(model, data_loader):
     # criterion = nn.MSELoss()
     criterion = NContrastLoss()
@@ -54,10 +53,10 @@ def train_model(model, data_loader):
                 x = x.cuda()
                 y = y.cuda()
             # Forward
-            out, out_dis = model(x)
-            loss = criterion(out_dis, y)
+            z, y_hat = model(x)
+            loss = criterion(y_hat, y)
             train_loss += loss.item()
-            train_acc += (abs(y-out_dis) < delta).float().mean()
+            train_acc += (abs(y-y_hat) < delta).float().mean()
             # Backward
             optimizer.zero_grad()
             loss.backward()
@@ -65,12 +64,12 @@ def train_model(model, data_loader):
 
         # Print loss and accuracy
         loader_step = len(data_loader)
-        if epoch == 0 or (epoch+1) % 100 == 0:
+        if epoch == 0 or (epoch+1) % 10 == 0:
             print(
                 f'---Epoch: {epoch+1}, Loss: {train_loss/loader_step:.6f}, Acc: {train_acc/loader_step:.6f}')
             # np.set_printoptions(precision=3, suppress=True)
             # print(y.numpy().T)
-            # print(out.detach().numpy().T)
+            # print(z.detach().numpy().T)
 
         if (epoch+1) == epoch_num:
             np.set_printoptions(precision=3, suppress=True)
@@ -78,12 +77,12 @@ def train_model(model, data_loader):
                 print()
                 print(y.cpu().numpy().T)
                 print()
-                print(out_dis.detach().cpu().numpy().T)
+                print(y_hat.detach().cpu().numpy().T)
             else:
                 print()
                 print(y.numpy().T)
                 print()
-                print(out_dis.detach().numpy().T)
+                print(y_hat.detach().numpy().T)
 
     # Save model
     if is_saving_model:
@@ -94,14 +93,19 @@ otu, adj = read_raw_data(otu_path, adj_path)
 spieces_num = otu.shape[0]
 sample_num = otu.shape[1]
 
-train_dataset = get_emb_dateset()
+# train_dataset = get_emb_dateset()
 
-loader = DataLoader(dataset=train_dataset,
-                    batch_size=batch_size, shuffle=False)
+# data_loader = DataLoader(dataset=train_dataset,
+#                     batch_size=batch_size, shuffle=False)
 
-model = Model(sample_num, 512, 64)
+train_data = get_real_dataset()
+
+data_loader = GMLPDataLoader(
+    data=train_data, batch_size=batch_size, shuffle=True)
+
+model = Model(6, 512, 64)
 
 if is_using_gpu:
     model = model.cuda()
 
-train_model(model, loader)
+train_model(model, data_loader)
