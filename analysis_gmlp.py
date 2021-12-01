@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.utils.data as Data
+from torch.utils.data import DataLoader
 from scipy.stats import spearmanr
 
 from model_gmlp import GMLPModel as Model

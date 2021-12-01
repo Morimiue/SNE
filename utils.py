@@ -3,8 +3,11 @@ import csv
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+import pandas as pd
 import torch
-import torch.utils.data as Data
+from scipy.sparse import coo_matrix
+from torch.utils.data import TensorDataset
+from torch_geometric.data import Data
 
 
 # Read data from file
@@ -21,6 +24,29 @@ def read_raw_data(otu_path, adj_path):
 
 
 # Get dataset
+def get_real_dataset(otu_path, adj_path):
+    samples_df = pd.read_csv('./data/real/samples.csv')
+
+    x = samples_df.values[:, 1:]
+
+    interactions_df = pd.read_csv('./data/real/interactions.csv')
+
+    gene1 = interactions_df.gene1.to_list()
+    gene2 = interactions_df.gene2.to_list()
+
+    gene_names = samples_df.name.to_list()
+
+    gene1_index = np.array([gene_names.index(i) for i in gene1])
+    gene2_index = np.array([gene_names.index(i) for i in gene2])
+
+    # edge_num = len(gene1)
+    # coo = coo_matrix(
+    #     (np.ones(edge_num), (gene1_index, gene2_index)), shape=(edge_num, edge_num))
+    edge_index = np.vstack((gene1_index, gene2_index))
+
+    return Data(x=x, edge_index=edge_index)
+
+
 def get_coe_dateset(otu, adj):
     spieces_num = otu.shape[0]
     sample_num = otu.shape[1]
@@ -47,12 +73,12 @@ def get_coe_dateset(otu, adj):
     x_train = torch.from_numpy(x_train).float()
     y_train = torch.from_numpy(y_train).float()
 
-    return Data.TensorDataset(x_train, y_train)
+    return TensorDataset(x_train, y_train)
 
 
 def get_emb_dateset():
     for i in range(100):
-        with open(f'./data/otu{i}.csv') as f:
+        with open(f'./data/synthetic/otu{i}.csv') as f:
             reader = csv.reader(f)
             otu = np.array(list(reader), dtype=np.float32)
             if i == 0:
@@ -61,7 +87,7 @@ def get_emb_dateset():
                 x_train = np.vstack((x_train, otu))
 
     for i in range(100):
-        with open(f'./data/adj{i}.csv') as f:
+        with open(f'./data/synthetic/adj{i}.csv') as f:
             reader = csv.reader(f)
             adj = np.array(list(reader), dtype=np.float32)
             if i == 0:
@@ -72,7 +98,7 @@ def get_emb_dateset():
     x_train = torch.from_numpy(x_train).float()
     y_train = torch.from_numpy(y_train).float()
 
-    return Data.TensorDataset(x_train, y_train)
+    return TensorDataset(x_train, y_train)
 
 
 # Draw graph

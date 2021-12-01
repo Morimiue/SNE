@@ -1,23 +1,15 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
-import torch.utils.data as Data
 
 
-def get_feature_dis(x):
-    """
-    x :           batch_size x nhid
-    x_dis(i,j):   item means the similarity between x(i) and x(j).
-    """
-    x_dis = x@x.T
-    mask = torch.eye(x_dis.shape[0])
-    x_sum = torch.sum(x**2, 1).reshape(-1, 1)
-    x_sum = torch.sqrt(x_sum).reshape(-1, 1)
-    x_sum = x_sum @ x_sum.T
-    x_dis = x_dis*(x_sum**(-1))
-    x_dis = (1-mask) * x_dis
-    return x_dis
+def get_y_hat(z):
+    b = z.shape[0]
+    y_hat = torch.zeros((b, b))
+    for i in range(b):
+        for j in range(b):
+            y_hat[i, j] = F.cosine_similarity(z[i], z[j], dim=0)
+    return y_hat
 
 
 class GMLPModel(nn.Module):
@@ -35,6 +27,6 @@ class GMLPModel(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
         if self.training:
-            return x, get_feature_dis(x)
+            return x, get_y_hat(x)
         else:
             return x

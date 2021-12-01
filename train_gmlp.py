@@ -4,15 +4,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.utils.data as Data
+from torch.utils.data import DataLoader
 
 from model_gmlp import GMLPModel as Model
 from utils import *
 
-
-otu_path = './data/otu0.csv'
-adj_path = './data/adj0.csv'
-wtd_adj_path = './data/wtd_adj0.csv'
+otu_path = './data/synthetic/otu0.csv'
+adj_path = './data/synthetic/adj0.csv'
+wtd_adj_path = './data/synthetic/wtd_adj0.csv'
 model_path = './models/gmlp_model.pth'
 
 batch_size = 20
@@ -22,6 +21,7 @@ delta = 0.10
 
 is_using_gpu = torch.cuda.is_available()
 is_saving_model = True
+
 
 class NContrastLoss(nn.Module):
     def __init__(self):
@@ -35,6 +35,8 @@ class NContrastLoss(nn.Module):
         return loss
 
 # Train model
+
+
 def train_model(model, data_loader):
     # criterion = nn.MSELoss()
     criterion = NContrastLoss()
@@ -94,8 +96,8 @@ sample_num = otu.shape[1]
 
 train_dataset = get_emb_dateset()
 
-loader = Data.DataLoader(dataset=train_dataset,
-                         batch_size=batch_size, shuffle=False)
+loader = DataLoader(dataset=train_dataset,
+                    batch_size=batch_size, shuffle=False)
 
 model = Model(sample_num, 512, 64)
 
