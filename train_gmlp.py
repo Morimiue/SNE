@@ -32,7 +32,7 @@ class NContrastLoss(nn.Module):
         y_hat = torch.exp(y_hat * tau)
         y_match_sum = torch.sum(y_hat * y, 1)
         y_sum = torch.sum(y_hat, 1)
-        loss = -torch.log(y_match_sum * (y_sum+1e-8)**(-1)).mean()
+        loss = -torch.log(y_match_sum * (y_sum)**(-1)+1e-8).mean()
         return loss
 
 
@@ -95,7 +95,7 @@ def train_model(model, data_loader):
 # train_dataset = get_emb_dateset()
 
 # data_loader = DataLoader(dataset=train_dataset,
-#                     batch_size=batch_size, shuffle=False)
+#                          batch_size=batch_size, shuffle=False)
 
 # train_data = get_real_dataset()
 train_data = get_cora_dataset()
