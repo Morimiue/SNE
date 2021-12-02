@@ -8,13 +8,14 @@ import torch
 from scipy.sparse import coo_matrix
 from torch.utils.data import DataLoader, TensorDataset
 from torch_geometric.data import Data
+from torch_geometric.datasets import Planetoid
 
 
 class GMLPDataLoader():
     def __init__(self, data: Data, batch_size: int, shuffle: bool = False, drop_last: bool = False):
-        self.x = torch.as_tensor(data.x)
+        self.x = torch.as_tensor(data.x, dtype=torch.float32)
         self.y = torch.as_tensor(coo_matrix((np.ones(data.edge_index.shape[1]), data.edge_index), shape=(
-            data.x.shape[0], data.x.shape[0])).toarray())
+            data.x.shape[0], data.x.shape[0])).toarray(), dtype=torch.float32)
         self.batch_size = batch_size
         self.shuffle = shuffle
         if drop_last:
@@ -24,9 +25,9 @@ class GMLPDataLoader():
                 len(self.x) + self.batch_size - 1) // self.batch_size
 
     def __iter__(self):
-        for _ in range(2):
+        for _ in range(self.sample_num):
             random_index = torch.as_tensor(np.random.choice(
-                np.arange(len(self.x)), self.batch_size))
+                np.arange(len(self.x)), self.batch_size), dtype=torch.long)
             x_batch = self.x[random_index]
             y_batch = self.y[random_index, :][:, random_index]
             yield x_batch, y_batch
@@ -49,6 +50,13 @@ def read_raw_data(otu_path, adj_path):
 
 
 # Get dataset
+def get_cora_dataset():
+    dataset = Planetoid('./data', 'Cora')
+    data = dataset[0]
+
+    return Data(x=data.x, edge_index=data.edge_index)
+
+
 def get_real_dataset():
     samples_df = pd.read_csv('./data/real/samples.csv')
 

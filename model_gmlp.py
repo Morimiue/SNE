@@ -15,13 +15,14 @@ def get_y_hat(z):
 
 
 class GMLPModel(nn.Module):
-    def __init__(self, in_dim, n_hidden_1, out_dim):
+    def __init__(self, in_dim, hidden_dim_1, out_dim):
         super(GMLPModel, self).__init__()
-        self.linear1 = nn.Linear(in_dim, n_hidden_1)
-        self.act = nn.PReLU()
-        self.ln = nn.LayerNorm(n_hidden_1, eps=1e-6)
-        self.dp = nn.Dropout(0.35)
-        self.linear2 = nn.Linear(n_hidden_1, out_dim)
+        self.linear1 = nn.Linear(in_dim, hidden_dim_1)
+        # self.act = nn.PReLU()
+        self.act = F.gelu
+        self.ln = nn.LayerNorm(hidden_dim_1, eps=1e-6)
+        self.dp = nn.Dropout(0.6)
+        self.linear2 = nn.Linear(hidden_dim_1, out_dim)
         self._init_weights()
 
     def _init_weights(self):
