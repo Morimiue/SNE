@@ -53,6 +53,7 @@ def get_real_dataset():
     samples_df = pd.read_csv('./data/real/samples.csv')
 
     x = samples_df.values[:, 1:].astype(np.float32)
+    x = torch.as_tensor(x)
 
     interactions_df = pd.read_csv('./data/real/interactions.csv')
 
@@ -69,6 +70,7 @@ def get_real_dataset():
     # edge_num = len(gene1)
     # coo = coo_matrix((np.ones(edge_num), (gene1_index, gene2_index)))
     edge_index = np.vstack((gene1_index, gene2_index))
+    edge_index = torch.as_tensor(edge_index)
 
     return Data(x=x, edge_index=edge_index)
 
