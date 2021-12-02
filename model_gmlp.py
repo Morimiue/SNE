@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 def get_y_hat(z):
     y_hat = z@z.T
-    mask = torch.eye(y_hat.shape[0]).cuda()
+    mask = torch.eye(y_hat.shape[0])
     z_sum = torch.sum(z**2, 1).reshape(-1, 1)
     z_sum = torch.sqrt(z_sum).reshape(-1, 1)
     z_sum = z_sum @ z_sum.T
@@ -24,6 +24,13 @@ class GMLPModel(nn.Module):
             nn.Dropout(0.35))
         self.layer2 = nn.Sequential(
             nn.Linear(n_hidden_1, out_dim))
+        self._init_weights()
+
+    def _init_weights(self):
+        nn.init.xavier_uniform_(self.layer1.weight)
+        nn.init.xavier_uniform_(self.layer1.weight)
+        nn.init.normal_(self.layer1.bias, std=1e-6)
+        nn.init.normal_(self.layer1.bias, std=1e-6)
 
     def forward(self, x):
         x = self.layer1(x)
