@@ -5,29 +5,33 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import torch
-from scipy.sparse import coo_matrix
 from torch.utils.data import DataLoader, TensorDataset
 from torch_geometric.data import Data
 from torch_geometric.datasets import Planetoid
 
 
 class GMLPDataLoader():
-    def __init__(self, data: Data, batch_size: int, shuffle: bool = False, drop_last: bool = False):
-        self.x = torch.as_tensor(data.x, dtype=torch.float32)
-        self.y = torch.as_tensor(coo_matrix((np.ones(data.edge_index.shape[1]), data.edge_index), shape=(
-            data.x.shape[0], data.x.shape[0])).toarray(), dtype=torch.float32)
+    def __init__(self,
+                 data: Data,
+                 batch_size: int,
+                 shuffle: bool = False,
+                 drop_last: bool = False):
+        self.x = data.x.type(torch.float32)
+        self.y = torch.sparse_coo_tensor(data.edge_index,
+                                         torch.ones(data.edge_index.shape[1]),
+                                         (data.x.shape[0], data.x.shape[0]))
+        self.y = self.y.to_dense().type(torch.float32)
         self.batch_size = batch_size
         self.shuffle = shuffle
         if drop_last:
             self.sample_num = len(self.x) // self.batch_size
         else:
-            self.sample_num = (
-                len(self.x) + self.batch_size - 1) // self.batch_size
+            self.sample_num = (len(self.x) + self.batch_size -
+                               1) // self.batch_size
 
     def __iter__(self):
         for _ in range(self.sample_num):
-            random_index = torch.as_tensor(np.random.choice(
-                np.arange(len(self.x)), self.batch_size), dtype=torch.long)
+            random_index = torch.randperm(len(self.x))[:self.batch_size]
             x_batch = self.x[random_index]
             y_batch = self.y[random_index, :][:, random_index]
             yield x_batch, y_batch
@@ -38,40 +42,39 @@ class GMLPDataLoader():
 
 # data cleaning
 def clean_data():
-    # get intersection of genes
+    # read raw data
     samples_df = pd.read_csv('./data/real/raw_samples.csv')
-    gene_in_samples = samples_df.name.to_list()
-    gene_in_samples = set(gene_in_samples)
+    interactions_df = pd.read_csv('./data/real/raw_interactions.csv',
+                                  usecols=[0, 1])
 
-    interactions_df = pd.read_csv(
-        './data/real/raw_interactions.csv', usecols=[0, 1])
-    gene1 = interactions_df.gene1.to_list()
-    gene2 = interactions_df.gene2.to_list()
-    gene_in_interactions = set(gene1 + gene2)
-
-    name_intersection = gene_in_samples & gene_in_interactions
+    # get intersection of genes
+    gene_in_samples = samples_df.iloc[:, 0].to_numpy()
+    gene_in_interactions = interactions_df.to_numpy()
+    name_intersection = np.intersect1d(gene_in_samples, gene_in_interactions)
 
     # get cleaned samples
-    raw_samples = samples_df.values
-    new_samples = np.array(samples_df.columns)
+    raw_samples = samples_df.to_numpy()
+    new_samples = samples_df.columns.to_numpy()
 
     for x in raw_samples:
         if x[0] in name_intersection:
             new_samples = np.vstack((new_samples, x))
 
-    pd.DataFrame(new_samples).to_csv(
-        './data/real/samples.csv', header=False, index=False)
+    pd.DataFrame(new_samples).to_csv('./data/real/samples.csv',
+                                     header=False,
+                                     index=False)
 
     # get cleaned interactions
-    raw_interactions = interactions_df.values
-    new_interactions = np.array(interactions_df.columns)
+    raw_interactions = interactions_df.to_numpy()
+    new_interactions = interactions_df.columns.to_numpy()
 
     for x in raw_interactions:
         if x[0] in name_intersection and x[1] in name_intersection:
             new_interactions = np.vstack((new_interactions, x))
 
-    pd.DataFrame(new_interactions).to_csv(
-        './data/real/interactions.csv', header=False, index=False)
+    pd.DataFrame(new_interactions).to_csv('./data/real/interactions.csv',
+                                          header=False,
+                                          index=False)
 
 
 # read data from file
@@ -97,26 +100,20 @@ def get_cora_dataset():
 
 def get_real_dataset():
     samples_df = pd.read_csv('./data/real/samples.csv')
-
-    x = samples_df.values[:, 1:].astype(np.float32)
-    x = torch.as_tensor(x)
-
     interactions_df = pd.read_csv('./data/real/interactions.csv')
 
+    x = samples_df.iloc[:, 1:].to_numpy(dtype=np.float32)
+    x = torch.as_tensor(x, dtype=torch.float32)
+
+    gene_names = samples_df.name.to_list()
     gene1 = interactions_df.gene1.to_list()
     gene2 = interactions_df.gene2.to_list()
 
-    gene_names = samples_df.name.to_list()
-
-    gene1_index = np.array([gene_names.index(i)
-                           for i in gene1], dtype=np.int32)
-    gene2_index = np.array([gene_names.index(i)
-                           for i in gene2], dtype=np.int32)
-
-    # edge_num = len(gene1)
-    # coo = coo_matrix((np.ones(edge_num), (gene1_index, gene2_index)))
-    edge_index = np.vstack((gene1_index, gene2_index))
-    edge_index = torch.as_tensor(edge_index)
+    gene1_index = torch.as_tensor([gene_names.index(i) for i in gene1],
+                                  dtype=torch.int32)
+    gene2_index = torch.as_tensor([gene_names.index(i) for i in gene2],
+                                  dtype=torch.int32)
+    edge_index = torch.vstack((gene1_index, gene2_index))
 
     return Data(x=x, edge_index=edge_index)
 
