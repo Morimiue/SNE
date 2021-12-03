@@ -118,35 +118,6 @@ def get_real_dataset():
     return Data(x=x, edge_index=edge_index)
 
 
-def get_coe_dateset(otu, adj):
-    spieces_num = otu.shape[0]
-    sample_num = otu.shape[1]
-
-    x_train = np.zeros((spieces_num * (spieces_num - 1), sample_num * 2))
-    y_train = np.zeros((spieces_num * (spieces_num - 1), 1))
-
-    cnt = 0
-    for i in range(spieces_num):
-        for j in range(spieces_num):
-            if i == j:
-                continue
-            x_train[cnt] = np.append(otu[i], otu[j])
-            cnt += 1
-
-    cnt = 0
-    for i in range(spieces_num):
-        for j in range(spieces_num):
-            if i == j:
-                continue
-            y_train[cnt] = adj[i][j]
-            cnt += 1
-
-    x_train = torch.from_numpy(x_train).float()
-    y_train = torch.from_numpy(y_train).float()
-
-    return TensorDataset(x_train, y_train)
-
-
 def get_emb_dateset():
     for i in range(100):
         with open(f'./data/synthetic/otu{i}.csv') as f:
