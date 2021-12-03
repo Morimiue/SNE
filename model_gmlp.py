@@ -37,7 +37,4 @@ class GMLPModel(nn.Module):
         x = self.dp(x)
         x = self.linear2(x)
 
-        if self.training:
-            return x, self._get_y_hat(x)
-        else:
-            return x
+        return x, self._get_y_hat(x)

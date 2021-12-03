@@ -109,7 +109,6 @@ if __name__ == '__main__':
                                  shuffle=True)
 
     model = Model(12, 256, 256)
-
     if is_using_gpu:
         model = model.cuda()
 
