@@ -36,14 +36,17 @@ def get_p_values(x, perm_num, threshold, model):
         torch_x = torch.as_tensor(x, dtype=torch.float32)
         if is_using_gpu:
             torch_x.cuda()
-        sne_init_score = model(torch_x)[1].detach().numpy()
+        sne_score[i] = model(torch_x)[1].detach().numpy()
 
         if i % 100 == 0:
             print(f'{i}th computation done')
     # compute p values
-    pcc_p = np.sum(pcc_score > pcc_init_score, axis=0) / perm_num
-    spm_p = np.sum(spm_score > spm_init_score, axis=0) / perm_num
-    sne_p = np.sum(sne_score > sne_init_score, axis=0) / perm_num
+    pcc_p = np.sum(np.abs(pcc_score) > np.abs(pcc_init_score),
+                   axis=0) / perm_num
+    spm_p = np.sum(np.abs(spm_score) > np.abs(spm_init_score),
+                   axis=0) / perm_num
+    sne_p = np.sum(np.abs(sne_score) > np.abs(sne_init_score),
+                   axis=0) / perm_num
     #
     pcc_ok = np.sum(pcc_p < threshold) / 2
     spm_ok = np.sum(spm_p < threshold) / 2
