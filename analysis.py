@@ -27,9 +27,10 @@ def get_perm_pvalue(x, y, num_permutation, method, y_hat):
         x = np.random.permutation(x)
         y = np.random.permutation(y)
         Scores_after_perm[i] = float(cal_corvalue(x, y, method, y_hat))
-    p_two_tail = np.sum(
-        np.abs(Scores_after_perm) >= initial_test_statistic)/np.float(num_permutation)
+    p_two_tail = np.sum(np.abs(Scores_after_perm) >= initial_test_statistic
+                        ) / np.float(num_permutation)
     return p_two_tail
+
 
 # x: the series1 of the correlation calculation
 # y: the series2 of the correlation calculation
@@ -41,26 +42,28 @@ def cal_corvalue(x, y, method, y_hat):
     y = np.asarray(y)
     if method == 'Pearson':
         return stats.pearsonr(x, y)[0]
-    elif(method == 'Spearman'):
+    elif (method == 'Spearman'):
         return stats.spearmanr(x, y)[0]
-    elif(method == 'nbd'):
+    elif (method == 'nbd'):
         return y_hat
     else:
         print("Error: 相关度计算参数不正确，可选参数为：Pearson,Spearman,nbd")
     return
 
-
     # significance: if the p-value is less than the threshold
     # we reject the null-hypothesis, and accept that our judgement is true
     # which means these two series is correlated
+
+
 if __name__ == '__main__':
     torch_data = get_real_dataset()
     # torch_data = get_cora_dataset()
-
     x = np.asarray(torch_data.x)
     edge_index = np.asarray(torch_data.edge_index)
     y = coo_matrix((np.ones(edge_index.shape[1]), edge_index),
                    (x.shape[0], x.shape[0])).todense()
+    if is_using_gpu:
+        torch_data = torch_data.cuda()
 
     model = Model(12, 256, 256)
     if is_using_gpu:
