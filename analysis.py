@@ -13,6 +13,7 @@ model_path = './models/gmlp_model.pth'
 is_using_gpu = torch.cuda.is_available()
 
 
+@torch.no_grad()
 def get_p_values(x, perm_num, threshold, model):
     '''
     if the p-value is less than the threshold we reject the null-hypothesis,
@@ -24,8 +25,9 @@ def get_p_values(x, perm_num, threshold, model):
     torch_x = torch.as_tensor(x, dtype=torch.float32)
     if is_using_gpu:
         torch_x = torch_x.cuda()
-
-    sne_init_score = model(torch_x)[1].detach().cpu().numpy()
+        sne_init_score = model(torch_x)[1].detach().cpu().numpy()
+    else:
+        sne_init_score = model(torch_x)[1].numpy()   
     # permutated statistics
     pcc_score = np.zeros((perm_num, x.shape[0], x.shape[0]))
     spm_score = np.zeros((perm_num, x.shape[0], x.shape[0]))
@@ -36,8 +38,10 @@ def get_p_values(x, perm_num, threshold, model):
         spm_score[i] = spearmanr(x, axis=1)[0]
         torch_x = torch.as_tensor(x, dtype=torch.float32)
         if is_using_gpu:
-            torch_x = torch_x.cuda()
-        sne_score[i] = model(torch_x)[1].detach().cpu().numpy()
+            torch_x.cuda()
+            sne_score[i] = model(torch_x)[1].cpu().numpy()
+        else:
+            sne_score[i] = model(torch_x)[1].numpy()
 
         if i % 100 == 0:
             print(f'{i}th computation done')
@@ -66,6 +70,7 @@ if __name__ == '__main__':
         torch_data = torch_data.cuda()
 
     model = Model(12, 256, 256)
+    model.load_state_dict(torch.load(model_path))
     if is_using_gpu:
         model = model.cuda()
 
