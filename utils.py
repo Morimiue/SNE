@@ -47,17 +47,22 @@ def clean_data():
     interactions_df = pd.read_csv('./data/real/raw_interactions.csv',
                                   usecols=[0, 1])
 
+    # keep only the rows with at least n non-zero values
+    samples_df = samples_df.replace(0, np.nan)
+    samples_df = samples_df.dropna(thresh=7)
+    samples_df = samples_df.replace(np.nan, 0)
+
     # get intersection of genes
     gene_in_samples = samples_df.iloc[:, 0].to_numpy()
     gene_in_interactions = interactions_df.to_numpy()
-    name_intersection = np.intersect1d(gene_in_samples, gene_in_interactions)
+    cleaned_genes = np.intersect1d(gene_in_samples, gene_in_interactions)
 
     # get cleaned samples
     raw_samples = samples_df.to_numpy()
     new_samples = samples_df.columns.to_numpy()
 
     for x in raw_samples:
-        if x[0] in name_intersection:
+        if x[0] in cleaned_genes:
             new_samples = np.vstack((new_samples, x))
 
     pd.DataFrame(new_samples).to_csv('./data/real/samples.csv',
@@ -69,7 +74,7 @@ def clean_data():
     new_interactions = interactions_df.columns.to_numpy()
 
     for x in raw_interactions:
-        if x[0] in name_intersection and x[1] in name_intersection:
+        if x[0] in cleaned_genes and x[1] in cleaned_genes:
             new_interactions = np.vstack((new_interactions, x))
 
     pd.DataFrame(new_interactions).to_csv('./data/real/interactions.csv',
@@ -105,9 +110,9 @@ def get_real_dataset():
     x = samples_df.iloc[:, 1:].to_numpy(dtype=np.float32)
     x = torch.as_tensor(x, dtype=torch.float32)
 
-    gene_names = samples_df.name.to_list()
-    gene1 = interactions_df.gene1.to_list()
-    gene2 = interactions_df.gene2.to_list()
+    gene_names = samples_df.iloc[:, 0].to_list()
+    gene1 = interactions_df.iloc[:, 0].to_list()
+    gene2 = interactions_df.iloc[:, 1].to_list()
 
     gene1_index = torch.as_tensor([gene_names.index(i) for i in gene1],
                                   dtype=torch.int32)
