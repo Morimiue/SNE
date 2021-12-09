@@ -212,3 +212,6 @@ def draw_raw_graph(G, pos, node_size, node_color):
 
     plt.axis('off')
     plt.show()
+
+
+clean_data()

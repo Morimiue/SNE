@@ -23,8 +23,9 @@ def get_p_values(x, perm_num, threshold, model):
     spm_init_score = spearmanr(x, axis=1)[0]
     torch_x = torch.as_tensor(x, dtype=torch.float32)
     if is_using_gpu:
-        torch_x.cuda()
-    sne_init_score = model(torch_x)[1].detach().numpy()
+        torch_x = torch_x.cuda()
+
+    sne_init_score = model(torch_x)[1].detach().cpu().numpy()
     # permutated statistics
     pcc_score = np.zeros((perm_num, x.shape[0], x.shape[0]))
     spm_score = np.zeros((perm_num, x.shape[0], x.shape[0]))
@@ -35,8 +36,8 @@ def get_p_values(x, perm_num, threshold, model):
         spm_score[i] = spearmanr(x, axis=1)[0]
         torch_x = torch.as_tensor(x, dtype=torch.float32)
         if is_using_gpu:
-            torch_x.cuda()
-        sne_score[i] = model(torch_x)[1].detach().numpy()
+            torch_x = torch_x.cuda()
+        sne_score[i] = model(torch_x)[1].detach().cpu().numpy()
 
         if i % 100 == 0:
             print(f'{i}th computation done')
