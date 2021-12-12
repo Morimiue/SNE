@@ -13,6 +13,7 @@ model_path = './models/gmlp_model.pth'
 
 batch_size = 256
 epoch_num = 1000
+contrasive_loss_m = 50
 learning_rate = 1e-4
 weight_decay = 5e-3
 delta = 0.10
@@ -36,10 +37,24 @@ class NContrastLoss(nn.Module):
         return loss
 
 
+class ContrastiveLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self,
+                z_dist: torch.Tensor,
+                y: torch.Tensor,
+                m: int = contrasive_loss_m) -> torch.Tensor:
+        loss = y * z_dist**2 + (1 - y) * torch.maximum(torch.zeros(y.shape),
+                                                       m - z_dist)**2
+        return loss.mean() / 2
+
+
 # train model
 def train_model(model, data_loader):
     # define criterion and optimizer
-    criterion = NContrastLoss()
+    # criterion = NContrastLoss()
+    criterion = ContrastiveLoss()
     # or use the
     optimizer = Adam(model.parameters(),
                      lr=learning_rate,
@@ -62,12 +77,15 @@ def train_model(model, data_loader):
             z, y_hat = model(x)
             # backward
             optimizer.zero_grad()
-            loss = criterion(y_hat, y) + F.mse_loss(y_hat, y) * 100
+            # loss = criterion(y_hat, y) + F.mse_loss(y_hat, y) * 100
+            loss = criterion(y_hat, y)
             loss.backward()
             optimizer.step()
             # accumulate loss and accuracy
             train_loss += loss
-            train_acc += (abs(y - y_hat) < delta).float().mean()
+            # train_acc += (abs(y - y_hat) < delta).float().mean()
+            true_y_hat = F.relu(1 - y_hat / contrasive_loss_m)
+            train_acc += (abs(y - true_y_hat) < delta).float().mean()
 
         # get loss and accuracy of this epoch
         loader_step = len(data_loader)
@@ -83,7 +101,8 @@ def train_model(model, data_loader):
         # print some data for debug
         if (epoch + 1) == epoch_num:
             # print(z)
-            print(y_hat)
+            # print(y_hat)
+            print(true_y_hat)
             print(y)
 
     # save last model

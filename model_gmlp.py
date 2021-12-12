@@ -21,14 +21,19 @@ class GMLPModel(nn.Module):
         nn.init.normal_(self.linear1.bias, std=1e-6)
         nn.init.normal_(self.linear2.bias, std=1e-6)
 
-    def _get_y_hat(self, z):
-        y_hat = z @ z.T
-        z_sum = torch.sum(z**2, 1).reshape(-1, 1)
-        z_sum = torch.sqrt(z_sum).reshape(-1, 1)
-        z_sum = z_sum @ z_sum.T
-        y_hat = y_hat * (z_sum**(-1))
-        # y_hat = y_hat.fill_diagonal_(0.)
-        return y_hat
+    def _get_z_sim(self, z):
+        dot_products = z @ z.T
+        magnitudes = torch.sum(z**2, 1).reshape(-1, 1)
+        magnitudes = torch.sqrt(magnitudes)
+        magnitudes = magnitudes @ magnitudes.T
+        z_sim = dot_products * (magnitudes**(-1))
+        # z_sim = z_sim.fill_diagonal_(0.)
+        return z_sim
+
+    def _get_z_dist(self, z):
+        z_dist = torch.norm(z[:, None] - z, dim=2, p=2)
+        # z_dist = z_dist.fill_diagonal_(1.)
+        return z_dist
 
     def forward(self, x):
         x = self.linear1(x)
@@ -37,4 +42,5 @@ class GMLPModel(nn.Module):
         x = self.dp(x)
         x = self.linear2(x)
 
-        return x, self._get_y_hat(x)
+        # return x, self._get_z_sim(x)
+        return x, self._get_z_dist(x)
