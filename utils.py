@@ -81,6 +81,44 @@ def clean_data():
                                           header=False,
                                           index=False)
 
+    # TODO: the following codes are quick and dirty, need to be improved
+    # get the largest connected component
+    data = get_real_dataset()
+
+    y = torch.sparse_coo_tensor(data.edge_index,
+                                torch.ones(data.edge_index.shape[1]),
+                                (data.x.shape[0], data.x.shape[0]))
+    y = y.to_dense().type(torch.float32).numpy()
+
+    G = nx.convert_matrix.from_numpy_matrix(y)
+    c = max(nx.connected_components(G), key=len)
+
+    cleaned_genes = cleaned_genes[list(c)]
+
+    # get cleaned samples
+    raw_samples = samples_df.to_numpy()
+    new_samples = samples_df.columns.to_numpy()
+
+    for x in raw_samples:
+        if x[0] in cleaned_genes:
+            new_samples = np.vstack((new_samples, x))
+
+    pd.DataFrame(new_samples).to_csv('./data/real/samples.csv',
+                                     header=False,
+                                     index=False)
+
+    # get cleaned interactions
+    raw_interactions = interactions_df.to_numpy()
+    new_interactions = interactions_df.columns.to_numpy()
+
+    for x in raw_interactions:
+        if x[0] in cleaned_genes and x[1] in cleaned_genes:
+            new_interactions = np.vstack((new_interactions, x))
+
+    pd.DataFrame(new_interactions).to_csv('./data/real/interactions.csv',
+                                          header=False,
+                                          index=False)
+
 
 # read data from file
 def read_raw_data(otu_path, adj_path):
