@@ -27,7 +27,7 @@ class GMLPModel(nn.Module):
         z_sum = torch.sqrt(z_sum).reshape(-1, 1)
         z_sum = z_sum @ z_sum.T
         y_hat = y_hat * (z_sum**(-1))
-        y_hat = y_hat.fill_diagonal_(0.)
+        # y_hat = y_hat.fill_diagonal_(0.)
         return y_hat
 
     def forward(self, x):

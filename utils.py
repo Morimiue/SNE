@@ -119,7 +119,12 @@ def get_real_dataset():
     gene2_index = torch.as_tensor([gene_names.index(i) for i in gene2],
                                   dtype=torch.int32)
     edge_index = torch.vstack((gene1_index, gene2_index))
-
+    gene3_index = torch.vstack((gene2_index, gene1_index))
+    edge_index = torch.hstack((gene3_index, edge_index))
+    gene4_index = torch.vstack((torch.as_tensor(range(x.shape[0])),
+                                torch.as_tensor(range(x.shape[0]))))
+    edge_index = torch.hstack((gene4_index, edge_index))
+    print(edge_index.shape)
     return Data(x=x, edge_index=edge_index)
 
 
