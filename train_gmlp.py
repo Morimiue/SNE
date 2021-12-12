@@ -12,8 +12,8 @@ adj_path = './data/synthetic/adj0.csv'
 model_path = './models/gmlp_model.pth'
 
 batch_size = 256
-epoch_num = 100
-learning_rate = 1e-2
+epoch_num = 1000
+learning_rate = 1e-4
 weight_decay = 5e-3
 delta = 0.10
 
@@ -40,6 +40,7 @@ class NContrastLoss(nn.Module):
 def train_model(model, data_loader):
     # define criterion and optimizer
     criterion = NContrastLoss()
+    # or use the
     optimizer = Adam(model.parameters(),
                      lr=learning_rate,
                      weight_decay=weight_decay)
@@ -61,7 +62,7 @@ def train_model(model, data_loader):
             z, y_hat = model(x)
             # backward
             optimizer.zero_grad()
-            loss = criterion(y_hat, y) + F.mse_loss(y_hat, y)
+            loss = criterion(y_hat, y) + F.mse_loss(y_hat, y) * 100
             loss.backward()
             optimizer.step()
             # accumulate loss and accuracy
