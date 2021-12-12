@@ -45,8 +45,11 @@ class ContrastiveLoss(nn.Module):
                 z_dist: torch.Tensor,
                 y: torch.Tensor,
                 m: int = contrasive_loss_m) -> torch.Tensor:
-        loss = y * z_dist**2 + (1 - y) * torch.maximum(torch.zeros(y.shape),
-                                                       m - z_dist)**2
+        if is_using_gpu:
+            zeros = torch.zeros(y.shape).cuda()
+        else:
+            zeros = torch.zeros(y.shape)
+        loss = y * z_dist**2 + (1 - y) * torch.maximum(zeros, m - z_dist)**2
         return loss.mean() / 2
 
 
