@@ -21,8 +21,9 @@ class GMLPDataLoader():
         self.y = torch.sparse_coo_tensor(data.edge_index,
                                          torch.ones(data.edge_index.shape[1]),
                                          (data.x.shape[0], data.x.shape[0]))
-        self.y = self.y.to_dense().type(torch.float32)
-        self.y *= self.y.T
+        self.y = self.y.to_dense()
+        self.y = torch.logical_or(self.y, self.y.T).type(torch.float32)
+        self.y = self.y.fill_diagonal_(1.)
         self.batch_size = batch_size
         self.shuffle = shuffle
         if drop_last:

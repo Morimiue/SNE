@@ -32,7 +32,10 @@ class GMLPModel(nn.Module):
 
     def _get_z_dist(self, z):
         z_dist = torch.norm(z[:, None] - z, dim=2, p=2)
-        # z_dist = z_dist.fill_diagonal_(1.)
+        return z_dist
+
+    def _get_z_dist_triu(self, z):
+        z_dist = torch.pdist(z, p=2)
         return z_dist
 
     def forward(self, x):
@@ -43,4 +46,7 @@ class GMLPModel(nn.Module):
         x = self.linear2(x)
 
         # return x, self._get_z_sim(x)
-        return x, self._get_z_dist(x)
+        if self.training:
+            return x, self._get_z_dist_triu(x)
+        else:
+            return x, self._get_z_dist(x)

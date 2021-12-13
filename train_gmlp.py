@@ -20,6 +20,8 @@ raw_interactions = './data/real/raw_many_interactions.csv'
 batch_size = 256
 epoch_num = 1000
 contrasive_loss_m = 700
+potential_loss_l = 30
+potential_loss_k = 900
 learning_rate = 1e-4
 weight_decay = 5e-3
 delta = 0.10
@@ -51,11 +53,27 @@ class ContrastiveLoss(nn.Module):
                 z_dist: torch.Tensor,
                 y: torch.Tensor,
                 m: int = contrasive_loss_m) -> torch.Tensor:
+        zeros = torch.zeros(y.shape)
         if is_using_gpu:
-            zeros = torch.zeros(y.shape).cuda()
-        else:
-            zeros = torch.zeros(y.shape)
-        loss = y * z_dist**2 + (1 - y) * torch.maximum(zeros, m - z_dist)**2
+            zeros = zeros.cuda()
+        ls = z_dist**2
+        ld = torch.maximum(zeros, m - z_dist)**2
+        loss = y * ls + (1 - y) * ld
+        return loss.mean() / 2
+
+
+class PotentialLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self,
+                z_dist: torch.Tensor,
+                y: torch.Tensor,
+                l: int = potential_loss_l,
+                k: int = potential_loss_k) -> torch.Tensor:
+        ls = (z_dist - l)**2
+        ld = k * (z_dist + 1e-8)**(-1)
+        loss = y * ls + (1 - y) * ld
         return loss.mean() / 2
 
 
@@ -63,7 +81,8 @@ class ContrastiveLoss(nn.Module):
 def train_model(model, data_loader):
     # define criterion and optimizer
     # criterion = NContrastLoss()
-    criterion = ContrastiveLoss()
+    # criterion = ContrastiveLoss()
+    criterion = PotentialLoss()
     # or use the
     optimizer = Adam(model.parameters(),
                      lr=learning_rate,
@@ -80,6 +99,8 @@ def train_model(model, data_loader):
         for _, data in enumerate(data_loader):
             # get batch
             x, y = data
+            i, j = torch.triu_indices(y.shape[0], y.shape[1], 1)
+            y = y[i, j]
             if is_using_gpu:
                 x, y = x.cuda(), y.cuda()
             # forward
@@ -93,14 +114,13 @@ def train_model(model, data_loader):
             # accumulate loss and accuracy
             train_loss += loss
             # train_acc += (abs(y - y_hat) < delta).float().mean()
-            true_y_hat = F.relu(1 - y_hat / contrasive_loss_m)
-            # count the true positive numbers
-            tpn = np.count_nonzero(
-                np.multiply(true_y_hat.cpu().detach().numpy(),
-                            y.cpu().detach().numpy()))
-            # train_acc += (abs(y - true_y_hat) < delta).float().mean()
-            train_acc += (tpn / np.count_nonzero(
-                y.cpu().detach().numpy())) / len(data_loader)
+            # true_y_hat = F.relu(1 - y_hat / contrasive_loss_m)
+            zeros = torch.zeros(y.shape)
+            if is_using_gpu:
+                zeros = zeros.cuda()
+            true_y_hat = torch.maximum(zeros,
+                                       -(y_hat - potential_loss_l)**2 + 1)
+            train_acc += (abs(y - true_y_hat) < delta).float().mean()
 
         # get loss and accuracy of this epoch
         loader_step = len(data_loader)
@@ -115,10 +135,10 @@ def train_model(model, data_loader):
 
         # print some data for debug
         if (epoch + 1) == epoch_num:
-            # print(z)
-            # print(y_hat)
-            print(true_y_hat)
-            print(y)
+            # print('z', z)
+            print('y_hat', y_hat)
+            print('true_y_hat', true_y_hat)
+            print('y', y)
 
     # save last model
     if is_saving_model:
