@@ -9,6 +9,8 @@ from model_gmlp import GMLPModel as Model
 from utils import *
 
 model_path = './models/gmlp_model.pth'
+samples = './data/real/samples.csv'
+interactions = './data/real/interactions.csv'
 
 is_using_gpu = torch.cuda.is_available()
 
@@ -88,6 +90,8 @@ def evaluate_our_model(x, y, perm_num, threshold, cut_threshold, model):
     spm_precision = spm_equal_y / np.count_nonzero(spm_cor_matrix)
     sne_precision = sne_equal_y / np.count_nonzero(sne_cor_matrix)
     print('三者精确率')
+    # pcc_precision = 1
+    # spm_precision = 1
     print(pcc_precision, spm_precision, sne_precision)
     # 计算召回率，此时只需要考虑真的正确，且我们预测正确的值
 
@@ -99,7 +103,7 @@ def evaluate_our_model(x, y, perm_num, threshold, cut_threshold, model):
 
 
 if __name__ == '__main__':
-    torch_data = get_real_dataset()
+    torch_data = get_real_dataset(samples, interactions)
     # torch_data = get_cora_dataset()
     x = np.asarray(torch_data.x)
     edge_index = np.asarray(torch_data.edge_index)
@@ -114,5 +118,5 @@ if __name__ == '__main__':
         model = model.cuda()
     model.eval()
     t = y[:100, :100].copy()
-    evaluate_our_model(x[:100], t, 100, 0.1, 0.5, model)
-    # get_p_values(x, y, 100, 0.1, 0.5, model)
+    evaluate_our_model(x[:100], t, 1000, 0.1, 0.9, model)
+    # evaluate_our_model(x, y, 100, 0.1, 0.9, model)

@@ -1,3 +1,4 @@
+from numpy.lib import utils
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,9 +12,14 @@ otu_path = './data/synthetic/otu0.csv'
 adj_path = './data/synthetic/adj0.csv'
 model_path = './models/gmlp_model.pth'
 
+samples = './data/real/samples.csv'
+interactions = './data/real/many_interactions_HIV.csv'
+raw_samples = './data/real/raw_samples.csv'
+raw_interactions = './data/real/raw_many_interactions.csv'
+
 batch_size = 256
 epoch_num = 1000
-contrasive_loss_m = 50
+contrasive_loss_m = 700
 learning_rate = 1e-4
 weight_decay = 5e-3
 delta = 0.10
@@ -88,7 +94,13 @@ def train_model(model, data_loader):
             train_loss += loss
             # train_acc += (abs(y - y_hat) < delta).float().mean()
             true_y_hat = F.relu(1 - y_hat / contrasive_loss_m)
-            train_acc += (abs(y - true_y_hat) < delta).float().mean()
+            # count the true positive numbers
+            tpn = np.count_nonzero(
+                np.multiply(true_y_hat.cpu().detach().numpy(),
+                            y.cpu().detach().numpy()))
+            # train_acc += (abs(y - true_y_hat) < delta).float().mean()
+            train_acc += (tpn / np.count_nonzero(
+                y.cpu().detach().numpy())) / len(data_loader)
 
         # get loss and accuracy of this epoch
         loader_step = len(data_loader)
@@ -123,15 +135,18 @@ if __name__ == '__main__':
     # data_loader = DataLoader(dataset=train_dataset,
     #                          batch_size=batch_size,
     #                          shuffle=False)
-
-    train_data = get_real_dataset()
+    # # clean_data(samples=samples,
+    #            intereactions=interactions,
+    #            raw_csv_samples=raw_samples,
+    #            raw_csv_interactions=raw_interactions)
+    train_data = get_real_dataset(samples=samples, interactions=interactions)
     # train_data = get_cora_dataset()
 
     data_loader = GMLPDataLoader(data=train_data,
                                  batch_size=batch_size,
                                  shuffle=True)
 
-    model = Model(12, 256, 256)
+    model = Model(21, 256, 256)
     if is_using_gpu:
         model = model.cuda()
 

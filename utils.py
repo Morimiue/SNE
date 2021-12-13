@@ -8,6 +8,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 from torch_geometric.data import Data
 from torch_geometric.datasets import Planetoid
+from torch_sparse import tensor
 
 
 class GMLPDataLoader():
@@ -21,6 +22,7 @@ class GMLPDataLoader():
                                          torch.ones(data.edge_index.shape[1]),
                                          (data.x.shape[0], data.x.shape[0]))
         self.y = self.y.to_dense().type(torch.float32)
+        self.y *= self.y.T
         self.batch_size = batch_size
         self.shuffle = shuffle
         if drop_last:
@@ -41,11 +43,12 @@ class GMLPDataLoader():
 
 
 # data cleaning
-def clean_data():
+def clean_data(samples: str, intereactions: str, raw_csv_samples: str,
+               raw_csv_interactions: str):
     # read raw data
-    samples_df = pd.read_csv('./data/real/raw_samples.csv')
-    interactions_df = pd.read_csv('./data/real/raw_interactions.csv',
-                                  usecols=[0, 1])
+    # str raw_samples = './data/real/'
+    samples_df = pd.read_csv(raw_csv_samples)
+    interactions_df = pd.read_csv(raw_csv_interactions, usecols=[0, 1])
 
     # keep only the rows with at least n non-zero values
     samples_df = samples_df.replace(0, np.nan)
@@ -65,9 +68,7 @@ def clean_data():
         if x[0] in cleaned_genes:
             new_samples = np.vstack((new_samples, x))
 
-    pd.DataFrame(new_samples).to_csv('./data/real/samples.csv',
-                                     header=False,
-                                     index=False)
+    pd.DataFrame(new_samples).to_csv(samples, header=False, index=False)
 
     # get cleaned interactions
     raw_interactions = interactions_df.to_numpy()
@@ -77,13 +78,13 @@ def clean_data():
         if x[0] in cleaned_genes and x[1] in cleaned_genes:
             new_interactions = np.vstack((new_interactions, x))
 
-    pd.DataFrame(new_interactions).to_csv('./data/real/interactions.csv',
+    pd.DataFrame(new_interactions).to_csv(intereactions,
                                           header=False,
                                           index=False)
 
     # TODO: the following codes are quick and dirty, need to be improved
     # get the largest connected component
-    data = get_real_dataset()
+    data = get_real_dataset(samples, intereactions)
 
     y = torch.sparse_coo_tensor(data.edge_index,
                                 torch.ones(data.edge_index.shape[1]),
@@ -103,9 +104,7 @@ def clean_data():
         if x[0] in cleaned_genes:
             new_samples = np.vstack((new_samples, x))
 
-    pd.DataFrame(new_samples).to_csv('./data/real/samples.csv',
-                                     header=False,
-                                     index=False)
+    pd.DataFrame(new_samples).to_csv(samples, header=False, index=False)
 
     # get cleaned interactions
     raw_interactions = interactions_df.to_numpy()
@@ -115,7 +114,7 @@ def clean_data():
         if x[0] in cleaned_genes and x[1] in cleaned_genes:
             new_interactions = np.vstack((new_interactions, x))
 
-    pd.DataFrame(new_interactions).to_csv('./data/real/interactions.csv',
+    pd.DataFrame(new_interactions).to_csv(intereactions,
                                           header=False,
                                           index=False)
 
@@ -141,9 +140,9 @@ def get_cora_dataset():
     return Data(x=data.x, edge_index=data.edge_index)
 
 
-def get_real_dataset():
-    samples_df = pd.read_csv('./data/real/samples.csv')
-    interactions_df = pd.read_csv('./data/real/interactions.csv')
+def get_real_dataset(samples: str, interactions: str):
+    samples_df = pd.read_csv(samples)
+    interactions_df = pd.read_csv(interactions)
 
     x = samples_df.iloc[:, 1:].to_numpy(dtype=np.float32)
     x = torch.as_tensor(x, dtype=torch.float32)
@@ -156,12 +155,8 @@ def get_real_dataset():
                                   dtype=torch.int32)
     gene2_index = torch.as_tensor([gene_names.index(i) for i in gene2],
                                   dtype=torch.int32)
-    edge_index = torch.vstack((gene1_index, gene2_index))
-    gene3_index = torch.vstack((gene2_index, gene1_index))
-    edge_index = torch.hstack((gene3_index, edge_index))
-    gene4_index = torch.vstack((torch.as_tensor(range(x.shape[0])),
-                                torch.as_tensor(range(x.shape[0]))))
-    edge_index = torch.hstack((gene4_index, edge_index))
+
+    edge_index = torch.hstack((gene1_index, gene2_index))
     print(edge_index.shape)
     return Data(x=x, edge_index=edge_index)
 
@@ -260,6 +255,3 @@ def draw_raw_graph(G, pos, node_size, node_color):
 
     plt.axis('off')
     plt.show()
-
-
-clean_data()
