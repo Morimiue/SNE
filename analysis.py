@@ -12,6 +12,9 @@ model_path = './models/gmlp_model.pth'
 samples = './data/real/samples.csv'
 interactions = './data/real/interactions.csv'
 
+contrasive_loss_m = 700
+potential_loss_l = 30
+
 is_using_gpu = torch.cuda.is_available()
 
 
@@ -25,11 +28,14 @@ def evaluate_our_model(x, y, perm_num, threshold, cut_threshold, model):
     pcc_init_score = np.corrcoef(x)
     spm_init_score = spearmanr(x, axis=1)[0]
     torch_x = torch.as_tensor(x, dtype=torch.float32)
+    zeros = torch.zeros(y.shape)
     if is_using_gpu:
         torch_x = torch_x.cuda()
-        sne_init_score = model(torch_x)[1].detach().cpu().numpy()
+        zeros = zeros.cuda()
+        y_hat = model(torch_x)[1].cpu().numpy()
     else:
-        sne_init_score = model(torch_x)[1].numpy()
+        y_hat = model(torch_x)[1].numpy()
+    sne_init_score = torch.maximum(zeros, -(y_hat - potential_loss_l)**2 + 1)
     n = y.shape[0]
     # 设置对角线元素为1
     y[range(n), range(n)] = 1
