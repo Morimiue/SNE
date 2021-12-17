@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from torch_geometric.data import Data
 from torch_geometric.datasets import Planetoid
 from torch_sparse import tensor
+from scipy import sparse as sp
 
 
 class GMLPDataLoader():
@@ -157,34 +158,28 @@ def get_real_dataset(samples: str, interactions: str):
     gene2_index = torch.as_tensor([gene_names.index(i) for i in gene2],
                                   dtype=torch.int32)
 
-    edge_index = torch.hstack((gene1_index, gene2_index))
+    edge_index = torch.vstack((gene1_index, gene2_index))
     print(edge_index.shape)
     return Data(x=x, edge_index=edge_index)
 
 
 def get_emb_dateset():
-    for i in range(100):
-        with open(f'./data/synthetic/otu{i}.csv') as f:
-            reader = csv.reader(f)
-            otu = np.array(list(reader), dtype=np.float32)
-            if i == 0:
-                x_train = otu
-            else:
-                x_train = np.vstack((x_train, otu))
+    samples_df = pd.read_csv('./data/sim/samples.csv')
+    interactions_adj = pd.read_csv('./data/sim/interactions.csv')
 
-    for i in range(100):
-        with open(f'./data/synthetic/adj{i}.csv') as f:
-            reader = csv.reader(f)
-            adj = np.array(list(reader), dtype=np.float32)
-            if i == 0:
-                y_train = adj
-            else:
-                y_train = np.vstack((y_train, adj))
+    x = samples_df.iloc[:, 1:].to_numpy(dtype=np.float32)
+    x = torch.as_tensor(x, dtype=torch.float32)
 
-    x_train = torch.from_numpy(x_train).float()
-    y_train = torch.from_numpy(y_train).float()
+    interactions_sparse = sp.coo_matrix(interactions_adj)
 
-    return TensorDataset(x_train, y_train)
+    interactions_indices = np.vstack(
+        (interactions_sparse.row, interactions_sparse.col))
+    edge_index = torch.LongTensor(interactions_indices)
+
+    return Data(x=x, edge_index=edge_index)
+
+
+# get_emb_dateset()
 
 
 # draw graph
