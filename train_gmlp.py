@@ -12,15 +12,15 @@ otu_path = './data/synthetic/otu0.csv'
 adj_path = './data/synthetic/adj0.csv'
 model_path = './models/gmlp_model.pth'
 
-samples = './data/real/samples.csv'
-interactions = './data/real/many_interactions_HIV.csv'
+samples = './data/real/samples_HIV.csv'
+interactions = './data/real/interactions_HIV.csv'
 raw_samples = './data/real/raw_samples.csv'
 raw_interactions = './data/real/raw_many_interactions.csv'
 
 batch_size = 256
 epoch_num = 1000
 contrasive_loss_m = 700
-potential_loss_l = 30
+potential_loss_l = 0.5
 potential_loss_k = 900
 learning_rate = 1e-4
 weight_decay = 5e-3
@@ -159,14 +159,14 @@ if __name__ == '__main__':
     #            intereactions=interactions,
     #            raw_csv_samples=raw_samples,
     #            raw_csv_interactions=raw_interactions)
-    train_data = get_real_dataset(samples=samples, interactions=interactions)
-    # train_data = get_cora_dataset()
+    # train_data = get_real_dataset(samples=samples, interactions=interactions)
+    train_data = get_cora_dataset('train')
 
     data_loader = GMLPDataLoader(data=train_data,
                                  batch_size=batch_size,
                                  shuffle=True)
 
-    model = Model(21, 256, 256)
+    model = Model(1433, 256, 256)
     if is_using_gpu:
         model = model.cuda()
 

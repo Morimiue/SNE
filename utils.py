@@ -11,6 +11,11 @@ from torch_geometric.datasets import Planetoid
 from torch_sparse import tensor
 from scipy import sparse as sp
 
+output_samples = './data/real/samples_dia.csv'
+output_interactions = './data/real/interactions_dia.csv'
+raw_samples = './data/real/raw_samples_dia.csv'
+raw_interactions = './data/real/raw_interactions.csv'
+
 
 class GMLPDataLoader():
     def __init__(self,
@@ -45,8 +50,8 @@ class GMLPDataLoader():
 
 
 # data cleaning
-def clean_data(samples: str, intereactions: str, raw_csv_samples: str,
-               raw_csv_interactions: str):
+def clean_data(output_samples: str, output_intereactions: str,
+               raw_csv_samples: str, raw_csv_interactions: str):
     # read raw data
     # str raw_samples = './data/real/'
     samples_df = pd.read_csv(raw_csv_samples)
@@ -70,7 +75,7 @@ def clean_data(samples: str, intereactions: str, raw_csv_samples: str,
         if x[0] in cleaned_genes:
             new_samples = np.vstack((new_samples, x))
 
-    pd.DataFrame(new_samples).to_csv(samples, header=False, index=False)
+    pd.DataFrame(new_samples).to_csv(output_samples, header=False, index=False)
 
     # get cleaned interactions
     raw_interactions = interactions_df.to_numpy()
@@ -80,13 +85,13 @@ def clean_data(samples: str, intereactions: str, raw_csv_samples: str,
         if x[0] in cleaned_genes and x[1] in cleaned_genes:
             new_interactions = np.vstack((new_interactions, x))
 
-    pd.DataFrame(new_interactions).to_csv(intereactions,
+    pd.DataFrame(new_interactions).to_csv(output_intereactions,
                                           header=False,
                                           index=False)
 
     # TODO: the following codes are quick and dirty, need to be improved
     # get the largest connected component
-    data = get_real_dataset(samples, intereactions)
+    data = get_real_dataset(output_samples, output_intereactions)
 
     y = torch.sparse_coo_tensor(data.edge_index,
                                 torch.ones(data.edge_index.shape[1]),
@@ -106,7 +111,7 @@ def clean_data(samples: str, intereactions: str, raw_csv_samples: str,
         if x[0] in cleaned_genes:
             new_samples = np.vstack((new_samples, x))
 
-    pd.DataFrame(new_samples).to_csv(samples, header=False, index=False)
+    pd.DataFrame(new_samples).to_csv(output_samples, header=False, index=False)
 
     # get cleaned interactions
     raw_interactions = interactions_df.to_numpy()
@@ -116,7 +121,7 @@ def clean_data(samples: str, intereactions: str, raw_csv_samples: str,
         if x[0] in cleaned_genes and x[1] in cleaned_genes:
             new_interactions = np.vstack((new_interactions, x))
 
-    pd.DataFrame(new_interactions).to_csv(intereactions,
+    pd.DataFrame(new_interactions).to_csv(output_intereactions,
                                           header=False,
                                           index=False)
 
@@ -135,18 +140,43 @@ def read_raw_data(otu_path, adj_path):
 
 
 # get dataset
-def get_cora_dataset():
+def get_cora_dataset(method, col=0):
     dataset = Planetoid('./data', 'Cora')
     data = dataset[0]
+    if (method == 'train'):
+        mask = data.train_mask
+    elif (method == 'test'):
+        mask = data.test_mask
+    # 获得非零元素的索引
+    mask = np.array(mask).astype(float)
+    mask_index = np.flatnonzero(mask)
+    # 由 edge_index 生成邻接矩阵
+    y = torch.sparse_coo_tensor(data.edge_index,
+                                torch.ones(data.edge_index.shape[1]),
+                                (data.x.shape[0], data.x.shape[0]))
+    y = y.to_dense()
+    # 筛选特定的行和列
+    y = y[np.ix_(mask_index, mask_index)]
+    x = data.x[np.ix_(mask_index)]
+    # 压缩x的特征
+    print(x.shape)
+    if (col != 0):
+        x = x[:, :col]
 
-    return Data(x=data.x, edge_index=data.edge_index)
+    # 转化为edge_index
+    y_sparse = sp.coo_matrix(y)
+    y_indices = np.vstack((y_sparse.row, y_sparse.col))
+    edge_index = torch.LongTensor(y_indices)
+    return Data(x=x, edge_index=edge_index)
 
 
-def get_real_dataset(samples: str, interactions: str):
+def get_real_dataset(samples: str, interactions: str, col: int = 0):
     samples_df = pd.read_csv(samples)
     interactions_df = pd.read_csv(interactions)
-
-    x = samples_df.iloc[:, 1:].to_numpy(dtype=np.float32)
+    if (col == 0):
+        x = samples_df.iloc[:, 1:].to_numpy(dtype=np.float32)
+    else:
+        x = samples_df.iloc[:, 1:col + 1].to_numpy(dtype=np.float32)
     x = torch.as_tensor(x, dtype=torch.float32)
 
     gene_names = samples_df.iloc[:, 0].to_list()
@@ -180,6 +210,11 @@ def get_emb_dateset():
 
 
 # get_emb_dateset()
+
+clean_data(output_samples=output_samples,
+           output_intereactions=output_interactions,
+           raw_csv_samples=raw_samples,
+           raw_csv_interactions=raw_interactions)
 
 
 # draw graph

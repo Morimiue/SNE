@@ -9,11 +9,10 @@ from model_gmlp import GMLPModel as Model
 from utils import *
 
 model_path = './models/gmlp_model.pth'
-samples = './data/real/samples.csv'
-interactions = './data/real/interactions.csv'
-
+samples = './data/real/samples_dia.csv'
+interactions = './data/real/interactions_dia.csv'
 contrasive_loss_m = 700
-potential_loss_l = 30
+potential_loss_l = 0.5
 
 is_using_gpu = torch.cuda.is_available()
 
@@ -32,16 +31,18 @@ def evaluate_our_model(x, y, perm_num, threshold, cut_threshold, model):
     if is_using_gpu:
         torch_x = torch_x.cuda()
         zeros = zeros.cuda()
-        y_hat = model(torch_x)[1].cpu().numpy()
+        y_hat = model(torch_x)[1].cpu()
     else:
-        y_hat = model(torch_x)[1].numpy()
-    sne_init_score = torch.maximum(zeros, -(y_hat - potential_loss_l)**2 + 1)
+        y_hat = model(torch_x)[1]
+    sne_init_score = torch.maximum(zeros.cpu(),
+                                   -(y_hat - potential_loss_l)**2 + 1).numpy()
     n = y.shape[0]
-    # 设置对角线元素为1
-    y[range(n), range(n)] = 1
-    pcc_init_score[range(n), range(n)] = 1
-    spm_init_score[range(n), range(n)] = 1
-    sne_init_score[range(n), range(n)] = 1
+    sne_init_score = np.array(sne_init_score)
+    # 设置对角线元素为0,以排除对角线元素干扰
+    y[range(n), range(n)] = 0
+    pcc_init_score[range(n), range(n)] = 0
+    spm_init_score[range(n), range(n)] = 0
+    sne_init_score[range(n), range(n)] = 0
     # permutated statistics
     pcc_score = np.zeros((perm_num, x.shape[0], x.shape[0]))
     spm_score = np.zeros((perm_num, x.shape[0], x.shape[0]))
@@ -80,11 +81,10 @@ def evaluate_our_model(x, y, perm_num, threshold, cut_threshold, model):
     spm_cor_matrix = (np.abs(spm_init_score) > cut_threshold).astype(float)
     sne_cor_matrix = (np.abs(sne_init_score) > cut_threshold).astype(float)
 
-    print("四者非0元素个数")
+    print("四者的相关对数")
     print(np.count_nonzero(pcc_cor_matrix), np.count_nonzero(spm_cor_matrix),
           np.count_nonzero(sne_cor_matrix), np.count_nonzero(y))
     # 我们预测相关，且p-value < threshold的元素数量
-    # np.count_nonzero 仅统计非对角线元素
     # np.multiply(pcc_cor_matrix, y) 得到对位相乘结果，而 * 不行，离谱
     pcc_equal_y = np.count_nonzero(np.multiply(pcc_cor_matrix, y))
     spm_equal_y = np.count_nonzero(np.multiply(spm_cor_matrix, y))
@@ -109,20 +109,19 @@ def evaluate_our_model(x, y, perm_num, threshold, cut_threshold, model):
 
 
 if __name__ == '__main__':
-    torch_data = get_real_dataset(samples, interactions)
-    # torch_data = get_cora_dataset()
+    # torch_data = get_real_dataset(samples, interactions, 12)
+    torch_data = get_cora_dataset('test')
     x = np.asarray(torch_data.x)
     edge_index = np.asarray(torch_data.edge_index)
     y = coo_matrix((np.ones(edge_index.shape[1]), edge_index),
                    (x.shape[0], x.shape[0])).todense()
     if is_using_gpu:
         torch_data = torch_data.cuda()
-
-    model = Model(12, 256, 256)
+    model = Model(1433, 256, 256)
     model.load_state_dict(torch.load(model_path))
     if is_using_gpu:
         model = model.cuda()
     model.eval()
-    t = y[:100, :100].copy()
-    evaluate_our_model(x[:100], t, 1000, 0.1, 0.9, model)
-    # evaluate_our_model(x, y, 100, 0.1, 0.9, model)
+    t = y[:1000, :1000].copy()
+    # evaluate_our_model(x[:100], t, 1000, 0.1, 0.8, model)
+    evaluate_our_model(x[:1000], t, 100, 1, 0.5, model)
