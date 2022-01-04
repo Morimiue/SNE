@@ -11,10 +11,10 @@ from torch_geometric.datasets import Planetoid
 from torch_sparse import tensor
 from scipy import sparse as sp
 
-output_samples = './data/real/samples_dia.csv'
-output_interactions = './data/real/interactions_dia.csv'
-raw_samples = './data/real/raw_samples_dia.csv'
-raw_interactions = './data/real/raw_interactions.csv'
+output_samples = './data/real/tuber/samples_tuber_many.csv'
+output_interactions = './data/real/tuber/interactions_tuber_many.csv'
+raw_samples = './data/real/tuber/tuberculosis.csv'
+raw_interactions = './data/real/tuber/raw_many_interactions.csv'
 
 
 class GMLPDataLoader():
@@ -193,11 +193,13 @@ def get_real_dataset(samples: str, interactions: str, col: int = 0):
     return Data(x=x, edge_index=edge_index)
 
 
-def get_emb_dateset():
+def get_emb_dataset(col):
     samples_df = pd.read_csv('./data/sim/samples.csv')
     interactions_adj = pd.read_csv('./data/sim/interactions.csv')
 
-    x = samples_df.iloc[:, 1:].to_numpy(dtype=np.float32)
+    rdn_col = np.random.randint(1, 51, col)
+
+    x = samples_df.iloc[:, rdn_col].to_numpy(dtype=np.float32)
     x = torch.as_tensor(x, dtype=torch.float32)
 
     interactions_sparse = sp.coo_matrix(interactions_adj)
@@ -211,10 +213,10 @@ def get_emb_dateset():
 
 # get_emb_dateset()
 
-clean_data(output_samples=output_samples,
-           output_intereactions=output_interactions,
-           raw_csv_samples=raw_samples,
-           raw_csv_interactions=raw_interactions)
+# clean_data(output_samples=output_samples,
+#    output_intereactions=output_interactions,
+#    raw_csv_samples=raw_samples,
+#    raw_csv_interactions=raw_interactions)
 
 
 # draw graph
