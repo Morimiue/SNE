@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.optim import Adam
+from torch.optim import Adam, AdamW
 from torch.utils.data import DataLoader
 
 from model_gmlp import GMLPModel as Model
@@ -9,22 +9,19 @@ from utils import *
 
 model_path = './models/gmlp_model.pth'
 
-otu_path = './data/synthetic/otu0.csv'
-adj_path = './data/synthetic/adj0.csv'
+raw_smpl_path = './data/real/raw/samples_raw_diabetes.csv'
+raw_intr_path = './data/real/raw/interactions_raw_trrust.csv'
+smpl_path = './data/real/processed/samples_trrust_dia.csv'
+intr_path = './data/real/processed/interactions_trrust_dia.csv'
 
-raw_smpl_path = './data/real/raw_samples.csv'
-raw_intr_path = './data/real/raw_interactions.csv'
-smpl_path = './data/real/samples.csv'
-intr_path = './data/real/interactions.csv'
-col = 12
-
+feature_size = 16
 batch_size = 512
 epoch_num = 200
 contrasive_loss_m = 700.
 potential_loss_l = 2.
-potential_loss_k = 4.
+potential_loss_k = 3.
 learning_rate = 1e-4
-weight_decay = 5e-3
+weight_decay = 1e-3
 delta = 0.10
 
 is_use_gpu = torch.cuda.is_available()
@@ -81,13 +78,13 @@ class PotentialLoss(nn.Module):
 # train model
 def train_model(model, data_loader):
     # define criterion and optimizer
-    criterion = NContrastLoss()
+    # criterion = NContrastLoss()
     # criterion = ContrastiveLoss()
-    # criterion = PotentialLoss()
+    criterion = PotentialLoss()
     # or use the
-    optimizer = Adam(model.parameters(),
-                     lr=learning_rate,
-                     weight_decay=weight_decay)
+    optimizer = AdamW(model.parameters(),
+                      lr=learning_rate,
+                      weight_decay=weight_decay)
 
     # train for epochs
     min_loss = float('inf')
@@ -138,7 +135,7 @@ def train_model(model, data_loader):
         if (epoch + 1) == epoch_num:
             # print('z', z)
             print('y_hat', y_hat)
-            # print('true_y_hat', true_y_hat)
+            print('true_y_hat', true_y_hat)
             print('y', y)
 
     # save last model
@@ -147,33 +144,16 @@ def train_model(model, data_loader):
 
 
 if __name__ == '__main__':
-    # otu, adj = read_raw_data(otu_path, adj_path)
-    # spieces_num = otu.shape[0]
-    # sample_num = otu.shape[1]
-
-    # train_dataset = get_emb_dateset()
-
-    # data_loader = DataLoader(dataset=train_dataset,
-    #                          batch_size=batch_size,
-    #                          shuffle=False)
-
-    # clean_data(
-    #     in_smpl_path=raw_smpl_path,
-    #     in_intr_path=raw_intr_path,
-    #     out_smpl_path=smpl_path,
-    #     out_intr_path=intr_path,
-    # )
-
-    train_data = get_real_dataset(smpl_path, intr_path, col)
-    # train_data = get_cora_dataset('train')
+    train_data = get_dataset(smpl_path, intr_path, feature_size)
+    # train_data = get_cora_dataset(train=True)
 
     data_loader = GMLPDataLoader(data=train_data,
                                  batch_size=batch_size,
                                  shuffle=True)
 
-    model = Model(col, 256, 256)
-    # model.load_state_dict(torch.load(model_path))
+    model = Model(feature_size, 256, 256)
     if is_use_gpu:
         model = model.cuda()
 
+    # model.load_state_dict(torch.load(model_path))
     train_model(model, data_loader)

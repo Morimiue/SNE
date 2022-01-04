@@ -10,12 +10,6 @@ from torch.utils.data import DataLoader, TensorDataset
 from torch_geometric.data import Data
 from torch_geometric.datasets import Planetoid
 from torch_sparse import tensor
-from scipy import sparse as sp
-
-output_samples = './data/real/tuber/samples_tuber_many.csv'
-output_interactions = './data/real/tuber/interactions_tuber_many.csv'
-raw_samples = './data/real/tuber/tuberculosis.csv'
-raw_interactions = './data/real/tuber/raw_many_interactions.csv'
 
 
 class GMLPDataLoader():
@@ -52,7 +46,15 @@ class GMLPDataLoader():
 
 # data cleaning
 def clean_data(in_smpl_path: str, in_intr_path: str, out_smpl_path: str,
-               out_intr_path: str):
+               out_intr_path: str) -> None:
+    """Clean data.
+
+    Args:
+        in_smpl_path (str): Path of input samples file.
+        in_intr_path (str): Path of input interactions file.
+        out_smpl_path (str): Path of output samples file.
+        out_intr_path (str): Path of output interactions file.
+    """
     # read raw data
     samples_df = pd.read_csv(in_smpl_path)
     interactions_df = pd.read_csv(in_intr_path, usecols=[0, 1])
@@ -91,7 +93,7 @@ def clean_data(in_smpl_path: str, in_intr_path: str, out_smpl_path: str,
 
     # TODO: the following codes are quick and dirty, need to be improved
     # get the largest connected component
-    data = get_real_dataset(out_smpl_path, out_intr_path)
+    data = get_dataset(out_smpl_path, out_intr_path)
 
     y = torch.sparse_coo_tensor(data.edge_index,
                                 torch.ones(data.edge_index.shape[1]),
@@ -126,26 +128,50 @@ def clean_data(in_smpl_path: str, in_intr_path: str, out_smpl_path: str,
                                           index=False)
 
 
-# read data from file
-def read_raw_data(otu_path, adj_path):
-    with open(otu_path) as f:
-        reader = csv.reader(f)
-        otu = np.array(list(reader), dtype=np.float32)
+def get_dataset(smpl_path: str, intr_path: str, col: int = 0) -> Data:
+    """Generate dataset from csv files.
 
-    with open(adj_path) as f:
-        reader = csv.reader(f)
-        adj = np.array(list(reader), dtype=np.float32)
+    Args:
+        smpl_path (str): Path of samples file.
+        intr_path (str): Path of interactions file.
+        col (int, optional): Only keep the first col columns. 0 means to keep all columns. Defaults to 0.
 
-    return otu, adj
+    Returns:
+        Data: Data.
+    """
+    samples_df = pd.read_csv(smpl_path)
+    interactions_df = pd.read_csv(intr_path)
+
+    if col:
+        x = samples_df.iloc[:, 1:col + 1].to_numpy(dtype=np.float32)
+    else:
+        x = samples_df.iloc[:, 1:].to_numpy(dtype=np.float32)
+    x = torch.as_tensor(x, dtype=torch.float32)
+
+    gene_names = samples_df.iloc[:, 0].to_list()
+    gene1 = interactions_df.iloc[:, 0].to_list()
+    gene2 = interactions_df.iloc[:, 1].to_list()
+
+    gene1_index = torch.as_tensor([gene_names.index(i) for i in gene1],
+                                  dtype=torch.int32)
+    gene2_index = torch.as_tensor([gene_names.index(i) for i in gene2],
+                                  dtype=torch.int32)
+
+    edge_index = torch.vstack((gene1_index, gene2_index))
+
+    print('get dataset done')
+    print('x.shape', x.shape)
+    print('edge_index.shape', edge_index.shape)
+    return Data(x=x, edge_index=edge_index)
 
 
 # get dataset
-def get_cora_dataset(method, col=0):
+def get_cora_dataset(train: bool, col: int = 0) -> Data:
     dataset = Planetoid('./data', 'Cora')
     data = dataset[0]
-    if (method == 'train'):
+    if train:
         mask = data.train_mask
-    elif (method == 'test'):
+    else:
         mask = data.test_mask
     # 获得非零元素的索引
     mask = np.array(mask).astype(float)
@@ -167,48 +193,6 @@ def get_cora_dataset(method, col=0):
     y_sparse = coo_matrix(y)
     y_indices = np.vstack((y_sparse.row, y_sparse.col))
     edge_index = torch.LongTensor(y_indices)
-    return Data(x=x, edge_index=edge_index)
-
-
-def get_real_dataset(smpl_path: str, intr_path: str, col: int = 0):
-    samples_df = pd.read_csv(smpl_path)
-    interactions_df = pd.read_csv(intr_path)
-    if col:
-        x = samples_df.iloc[:, 1:col + 1].to_numpy(dtype=np.float32)
-    else:
-        x = samples_df.iloc[:, 1:].to_numpy(dtype=np.float32)
-    x = torch.as_tensor(x, dtype=torch.float32)
-
-    gene_names = samples_df.iloc[:, 0].to_list()
-    gene1 = interactions_df.iloc[:, 0].to_list()
-    gene2 = interactions_df.iloc[:, 1].to_list()
-
-    gene1_index = torch.as_tensor([gene_names.index(i) for i in gene1],
-                                  dtype=torch.int32)
-    gene2_index = torch.as_tensor([gene_names.index(i) for i in gene2],
-                                  dtype=torch.int32)
-
-    edge_index = torch.vstack((gene1_index, gene2_index))
-    print('x.shape', x.shape)
-    print('edge_index.shape', edge_index.shape)
-    return Data(x=x, edge_index=edge_index)
-
-
-def get_emb_dataset(col):
-    samples_df = pd.read_csv('./data/sim/samples.csv')
-    interactions_adj = pd.read_csv('./data/sim/interactions.csv')
-
-    rdn_col = np.random.randint(1, 51, col)
-
-    x = samples_df.iloc[:, rdn_col].to_numpy(dtype=np.float32)
-    x = torch.as_tensor(x, dtype=torch.float32)
-
-    interactions_sparse = coo_matrix(interactions_adj)
-
-    interactions_indices = np.vstack(
-        (interactions_sparse.row, interactions_sparse.col))
-    edge_index = torch.LongTensor(interactions_indices)
-
     return Data(x=x, edge_index=edge_index)
 
 

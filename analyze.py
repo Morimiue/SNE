@@ -1,21 +1,23 @@
+import pickle
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from scipy.sparse import coo_matrix
 from scipy.stats import spearmanr
-import pickle
+
 from model_gmlp import GMLPModel as Model
 from utils import *
 
 model_path = './models/gmlp_model.pth'
 
-raw_smpl_path = './data/real/raw_samples.csv'
-raw_intr_path = './data/real/raw_interactions.csv'
-smpl_path = './data/real/dia/samples_dia_little.csv'
-intr_path = './data/real/dia/interactions_dia_little.csv'
+raw_smpl_path = './data/real/raw/samples_raw_tuberculosis.csv'
+raw_intr_path = './data/real/raw/interactions_raw_trrust.csv'
+smpl_path = './data/real/processed/samples_trrust_tuber.csv'
+intr_path = './data/real/processed/interactions_trrust_tuber.csv'
 
-col = 40
+feature_size = 16
 contrasive_loss_m = 700.
 potential_loss_l = 2.
 
@@ -249,18 +251,18 @@ if __name__ == '__main__':
     #     out_intr_path=intr_path,
     # )
 
-    torch_data = get_real_dataset(smpl_path, intr_path, col)
-    # torch_data = get_cora_dataset('test')
+    torch_data = get_dataset(smpl_path, intr_path, feature_size)
+    # torch_data = get_cora_dataset(train=False)
 
     x = np.asarray(torch_data.x)
     edge_index = np.asarray(torch_data.edge_index)
     y = coo_matrix((np.ones(edge_index.shape[1]), edge_index),
                    (x.shape[0], x.shape[0])).todense()
 
-    model = Model(col, 256, 256)
-    model.load_state_dict(torch.load(model_path))
+    model = Model(feature_size, 256, 256)
     if is_use_gpu:
         model = model.cuda()
+    model.load_state_dict(torch.load(model_path))
     model.eval()
 
     # quick evaluate

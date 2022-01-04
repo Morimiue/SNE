@@ -3,14 +3,17 @@ import random
 import csv
 import math
 
+smpl_path = './data/sim/samples.csv'
+intr_path = './data/sim/interactions.csv'
+
 hub_num = 20
 speicies_num = 2000
-samples_num = 50
+samples_num = 40
 Huge_Enough = 10
 
 
 def generate_simulated_data(hub_num, speicies_num, samples_num):
-
+    """"""
     mean = np.random.rand(speicies_num)
     mean -= 1
     hubs = random.sample(range(speicies_num), hub_num)
@@ -30,15 +33,14 @@ def generate_simulated_data(hub_num, speicies_num, samples_num):
     for co in cov:
         _range = np.max(co) - np.min(co)
         co = (co - np.min(co)) / _range
-    # lny 服从多元高斯分布，我们要获得y
+    # lny 服从多元高斯分布，我们要获得 y
     otus = np.random.multivariate_normal(mean, cov, (samples_num), 'raise')
     otus = np.exp(otus)
-    otu_data_path = 'data/sim/samples.csv'
-    with open(otu_data_path, 'w', newline='') as f:
+
+    with open(smpl_path, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerows(otus.T)
-    interactions_path = 'data/sim/interactions.csv'
-    with open(interactions_path, 'w', newline='') as f:
+    with open(intr_path, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerows(adj)
 
