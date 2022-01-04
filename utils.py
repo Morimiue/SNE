@@ -5,9 +5,11 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import torch
+from scipy.sparse import coo_matrix
 from torch.utils.data import DataLoader, TensorDataset
 from torch_geometric.data import Data
 from torch_geometric.datasets import Planetoid
+<<<<<<< HEAD
 from torch_sparse import tensor
 from scipy import sparse as sp
 
@@ -15,6 +17,8 @@ output_samples = './data/real/tuber/samples_tuber_many.csv'
 output_interactions = './data/real/tuber/interactions_tuber_many.csv'
 raw_samples = './data/real/tuber/tuberculosis.csv'
 raw_interactions = './data/real/tuber/raw_many_interactions.csv'
+=======
+>>>>>>> 3907b8ce7af58cdb39e78734f6952fb7243e99db
 
 
 class GMLPDataLoader():
@@ -50,12 +54,11 @@ class GMLPDataLoader():
 
 
 # data cleaning
-def clean_data(output_samples: str, output_intereactions: str,
-               raw_csv_samples: str, raw_csv_interactions: str):
+def clean_data(in_smpl_path: str, in_intr_path: str, out_smpl_path: str,
+               out_intr_path: str):
     # read raw data
-    # str raw_samples = './data/real/'
-    samples_df = pd.read_csv(raw_csv_samples)
-    interactions_df = pd.read_csv(raw_csv_interactions, usecols=[0, 1])
+    samples_df = pd.read_csv(in_smpl_path)
+    interactions_df = pd.read_csv(in_intr_path, usecols=[0, 1])
 
     # keep only the rows with at least n non-zero values
     samples_df = samples_df.replace(0, np.nan)
@@ -75,7 +78,7 @@ def clean_data(output_samples: str, output_intereactions: str,
         if x[0] in cleaned_genes:
             new_samples = np.vstack((new_samples, x))
 
-    pd.DataFrame(new_samples).to_csv(output_samples, header=False, index=False)
+    pd.DataFrame(new_samples).to_csv(out_smpl_path, header=False, index=False)
 
     # get cleaned interactions
     raw_interactions = interactions_df.to_numpy()
@@ -85,13 +88,13 @@ def clean_data(output_samples: str, output_intereactions: str,
         if x[0] in cleaned_genes and x[1] in cleaned_genes:
             new_interactions = np.vstack((new_interactions, x))
 
-    pd.DataFrame(new_interactions).to_csv(output_intereactions,
+    pd.DataFrame(new_interactions).to_csv(out_intr_path,
                                           header=False,
                                           index=False)
 
     # TODO: the following codes are quick and dirty, need to be improved
     # get the largest connected component
-    data = get_real_dataset(output_samples, output_intereactions)
+    data = get_real_dataset(out_smpl_path, out_intr_path)
 
     y = torch.sparse_coo_tensor(data.edge_index,
                                 torch.ones(data.edge_index.shape[1]),
@@ -111,7 +114,7 @@ def clean_data(output_samples: str, output_intereactions: str,
         if x[0] in cleaned_genes:
             new_samples = np.vstack((new_samples, x))
 
-    pd.DataFrame(new_samples).to_csv(output_samples, header=False, index=False)
+    pd.DataFrame(new_samples).to_csv(out_smpl_path, header=False, index=False)
 
     # get cleaned interactions
     raw_interactions = interactions_df.to_numpy()
@@ -121,7 +124,7 @@ def clean_data(output_samples: str, output_intereactions: str,
         if x[0] in cleaned_genes and x[1] in cleaned_genes:
             new_interactions = np.vstack((new_interactions, x))
 
-    pd.DataFrame(new_interactions).to_csv(output_intereactions,
+    pd.DataFrame(new_interactions).to_csv(out_intr_path,
                                           header=False,
                                           index=False)
 
@@ -164,19 +167,19 @@ def get_cora_dataset(method, col=0):
         x = x[:, :col]
 
     # 转化为edge_index
-    y_sparse = sp.coo_matrix(y)
+    y_sparse = coo_matrix(y)
     y_indices = np.vstack((y_sparse.row, y_sparse.col))
     edge_index = torch.LongTensor(y_indices)
     return Data(x=x, edge_index=edge_index)
 
 
-def get_real_dataset(samples: str, interactions: str, col: int = 0):
-    samples_df = pd.read_csv(samples)
-    interactions_df = pd.read_csv(interactions)
-    if (col == 0):
-        x = samples_df.iloc[:, 1:].to_numpy(dtype=np.float32)
-    else:
+def get_real_dataset(smpl_path: str, intr_path: str, col: int = 0):
+    samples_df = pd.read_csv(smpl_path)
+    interactions_df = pd.read_csv(intr_path)
+    if col:
         x = samples_df.iloc[:, 1:col + 1].to_numpy(dtype=np.float32)
+    else:
+        x = samples_df.iloc[:, 1:].to_numpy(dtype=np.float32)
     x = torch.as_tensor(x, dtype=torch.float32)
 
     gene_names = samples_df.iloc[:, 0].to_list()
@@ -189,7 +192,8 @@ def get_real_dataset(samples: str, interactions: str, col: int = 0):
                                   dtype=torch.int32)
 
     edge_index = torch.vstack((gene1_index, gene2_index))
-    print(edge_index.shape)
+    print('x.shape', x.shape)
+    print('edge_index.shape', edge_index.shape)
     return Data(x=x, edge_index=edge_index)
 
 
@@ -202,7 +206,7 @@ def get_emb_dataset(col):
     x = samples_df.iloc[:, rdn_col].to_numpy(dtype=np.float32)
     x = torch.as_tensor(x, dtype=torch.float32)
 
-    interactions_sparse = sp.coo_matrix(interactions_adj)
+    interactions_sparse = coo_matrix(interactions_adj)
 
     interactions_indices = np.vstack(
         (interactions_sparse.row, interactions_sparse.col))
@@ -211,6 +215,7 @@ def get_emb_dataset(col):
     return Data(x=x, edge_index=edge_index)
 
 
+<<<<<<< HEAD
 # get_emb_dateset()
 
 # clean_data(output_samples=output_samples,
@@ -219,6 +224,8 @@ def get_emb_dataset(col):
 #    raw_csv_interactions=raw_interactions)
 
 
+=======
+>>>>>>> 3907b8ce7af58cdb39e78734f6952fb7243e99db
 # draw graph
 def draw_graph(G, pos, node_size, node_color):
     nx.draw_networkx_nodes(

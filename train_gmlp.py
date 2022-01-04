@@ -1,4 +1,3 @@
-from numpy.lib import utils
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,27 +7,27 @@ from torch.utils.data import DataLoader
 from model_gmlp import GMLPModel as Model
 from utils import *
 
-otu_path = './data/synthetic/otu0.csv'
-adj_path = './data/synthetic/adj0.csv'
 model_path = './models/gmlp_model.pth'
 
-samples = './data/real/tuber/samples_tuber_little.csv'
-interactions = './data/real/tuber/interactions_tuber_little.csv'
-raw_samples = './data/real/raw_samples.csv'
-raw_interactions = './data/real/raw_many_interactions.csv'
-col = 40
+otu_path = './data/synthetic/otu0.csv'
+adj_path = './data/synthetic/adj0.csv'
 
-batch_size = 256
-epoch_num = 3000
-contrasive_loss_m = 50
-potential_loss_l = 0
-potential_loss_k = 900
+raw_smpl_path = './data/real/raw_samples.csv'
+raw_intr_path = './data/real/raw_interactions.csv'
+smpl_path = './data/real/samples.csv'
+intr_path = './data/real/interactions.csv'
+
+batch_size = 512
+epoch_num = 200
+contrasive_loss_m = 700.
+potential_loss_l = 2.
+potential_loss_k = 4.
 learning_rate = 1e-4
 weight_decay = 5e-3
 delta = 0.10
 
-is_using_gpu = torch.cuda.is_available()
-is_saving_model = True
+is_use_gpu = torch.cuda.is_available()
+is_save_model = True
 
 
 class NContrastLoss(nn.Module):
@@ -53,9 +52,9 @@ class ContrastiveLoss(nn.Module):
     def forward(self,
                 z_dist: torch.Tensor,
                 y: torch.Tensor,
-                m: int = contrasive_loss_m) -> torch.Tensor:
+                m: float = contrasive_loss_m) -> torch.Tensor:
         zeros = torch.zeros(y.shape)
-        if is_using_gpu:
+        if is_use_gpu:
             zeros = zeros.cuda()
         ls = z_dist**2
         ld = torch.maximum(zeros, m - z_dist)**2
@@ -70,8 +69,8 @@ class PotentialLoss(nn.Module):
     def forward(self,
                 z_dist: torch.Tensor,
                 y: torch.Tensor,
-                l: int = potential_loss_l,
-                k: int = potential_loss_k) -> torch.Tensor:
+                l: float = potential_loss_l,
+                k: float = potential_loss_k) -> torch.Tensor:
         ls = (z_dist - l)**2
         ld = k * (z_dist + 1e-8)**(-1)
         loss = y * ls + (1 - y) * ld
@@ -100,9 +99,9 @@ def train_model(model, data_loader):
         for _, data in enumerate(data_loader):
             # get batch
             x, y = data
-            # i, j = torch.triu_indices(y.shape[0], y.shape[1], 1)
-            # y = y[i, j]
-            if is_using_gpu:
+            i, j = torch.triu_indices(y.shape[0], y.shape[1], 1)
+            y = y[i, j]
+            if is_use_gpu:
                 x, y = x.cuda(), y.cuda()
             # forward
             z, y_hat = model(x)
@@ -116,12 +115,21 @@ def train_model(model, data_loader):
             train_loss += loss
             train_acc += (abs(y - y_hat) < delta).float().mean()
             # true_y_hat = F.relu(1 - y_hat / contrasive_loss_m)
+<<<<<<< HEAD
             # zeros = torch.zeros(y.shape)
             # if is_using_gpu:
             #     zeros = zeros.cuda()
             # true_y_hat = torch.maximum(zeros,
             #                            -(y_hat - potential_loss_l)**2 + 1)
             # train_acc += (abs(y - true_y_hat) < delta).float().mean()
+=======
+            zeros = torch.zeros(y.shape)
+            if is_use_gpu:
+                zeros = zeros.cuda()
+            true_y_hat = torch.maximum(zeros,
+                                       -(y_hat / potential_loss_l - 1)**2 + 1)
+            train_acc += (abs(y - true_y_hat) < delta).float().mean()
+>>>>>>> 3907b8ce7af58cdb39e78734f6952fb7243e99db
 
         # get loss and accuracy of this epoch
         loader_step = len(data_loader)
@@ -142,7 +150,7 @@ def train_model(model, data_loader):
             print('y', y)
 
     # save last model
-    if is_saving_model:
+    if is_save_model:
         torch.save(model.state_dict(), model_path)
 
 
@@ -156,6 +164,7 @@ if __name__ == '__main__':
     # data_loader = DataLoader(dataset=train_dataset,
     #                          batch_size=batch_size,
     #                          shuffle=False)
+<<<<<<< HEAD
     # # clean_data(samples=samples,
     #            intereactions=interactions,
     #            raw_csv_samples=raw_samples,
@@ -165,13 +174,31 @@ if __name__ == '__main__':
                                   col=col)
     # train_data = get_cora_dataset('train')
     # train_data = get_emb_dataset(col)
+=======
+
+    clean_data(
+        in_smpl_path=raw_smpl_path,
+        in_intr_path=raw_intr_path,
+        out_smpl_path=smpl_path,
+        out_intr_path=intr_path,
+    )
+
+    train_data = get_real_dataset(smpl_path, intr_path, 12)
+    # train_data = get_cora_dataset('train')
+
+>>>>>>> 3907b8ce7af58cdb39e78734f6952fb7243e99db
     data_loader = GMLPDataLoader(data=train_data,
                                  batch_size=batch_size,
                                  shuffle=True)
 
+<<<<<<< HEAD
     model = Model(col, 256, 256)
     # model.load_state_dict(torch.load(model_path))
     if is_using_gpu:
+=======
+    model = Model(12, 256, 256)
+    if is_use_gpu:
+>>>>>>> 3907b8ce7af58cdb39e78734f6952fb7243e99db
         model = model.cuda()
 
     train_model(model, data_loader)
