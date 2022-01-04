@@ -16,6 +16,7 @@ raw_smpl_path = './data/real/raw_samples.csv'
 raw_intr_path = './data/real/raw_interactions.csv'
 smpl_path = './data/real/samples.csv'
 intr_path = './data/real/interactions.csv'
+col = 12
 
 batch_size = 512
 epoch_num = 200
@@ -115,21 +116,12 @@ def train_model(model, data_loader):
             train_loss += loss
             train_acc += (abs(y - y_hat) < delta).float().mean()
             # true_y_hat = F.relu(1 - y_hat / contrasive_loss_m)
-<<<<<<< HEAD
-            # zeros = torch.zeros(y.shape)
-            # if is_using_gpu:
-            #     zeros = zeros.cuda()
-            # true_y_hat = torch.maximum(zeros,
-            #                            -(y_hat - potential_loss_l)**2 + 1)
-            # train_acc += (abs(y - true_y_hat) < delta).float().mean()
-=======
             zeros = torch.zeros(y.shape)
             if is_use_gpu:
                 zeros = zeros.cuda()
             true_y_hat = torch.maximum(zeros,
                                        -(y_hat / potential_loss_l - 1)**2 + 1)
             train_acc += (abs(y - true_y_hat) < delta).float().mean()
->>>>>>> 3907b8ce7af58cdb39e78734f6952fb7243e99db
 
         # get loss and accuracy of this epoch
         loader_step = len(data_loader)
@@ -164,41 +156,24 @@ if __name__ == '__main__':
     # data_loader = DataLoader(dataset=train_dataset,
     #                          batch_size=batch_size,
     #                          shuffle=False)
-<<<<<<< HEAD
-    # # clean_data(samples=samples,
-    #            intereactions=interactions,
-    #            raw_csv_samples=raw_samples,
-    #            raw_csv_interactions=raw_interactions)
-    train_data = get_real_dataset(samples=samples,
-                                  interactions=interactions,
-                                  col=col)
-    # train_data = get_cora_dataset('train')
-    # train_data = get_emb_dataset(col)
-=======
 
-    clean_data(
-        in_smpl_path=raw_smpl_path,
-        in_intr_path=raw_intr_path,
-        out_smpl_path=smpl_path,
-        out_intr_path=intr_path,
-    )
+    # clean_data(
+    #     in_smpl_path=raw_smpl_path,
+    #     in_intr_path=raw_intr_path,
+    #     out_smpl_path=smpl_path,
+    #     out_intr_path=intr_path,
+    # )
 
-    train_data = get_real_dataset(smpl_path, intr_path, 12)
+    train_data = get_real_dataset(smpl_path, intr_path, col)
     # train_data = get_cora_dataset('train')
 
->>>>>>> 3907b8ce7af58cdb39e78734f6952fb7243e99db
     data_loader = GMLPDataLoader(data=train_data,
                                  batch_size=batch_size,
                                  shuffle=True)
 
-<<<<<<< HEAD
     model = Model(col, 256, 256)
     # model.load_state_dict(torch.load(model_path))
-    if is_using_gpu:
-=======
-    model = Model(12, 256, 256)
     if is_use_gpu:
->>>>>>> 3907b8ce7af58cdb39e78734f6952fb7243e99db
         model = model.cuda()
 
     train_model(model, data_loader)

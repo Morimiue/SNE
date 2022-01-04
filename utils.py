@@ -9,7 +9,6 @@ from scipy.sparse import coo_matrix
 from torch.utils.data import DataLoader, TensorDataset
 from torch_geometric.data import Data
 from torch_geometric.datasets import Planetoid
-<<<<<<< HEAD
 from torch_sparse import tensor
 from scipy import sparse as sp
 
@@ -17,8 +16,6 @@ output_samples = './data/real/tuber/samples_tuber_many.csv'
 output_interactions = './data/real/tuber/interactions_tuber_many.csv'
 raw_samples = './data/real/tuber/tuberculosis.csv'
 raw_interactions = './data/real/tuber/raw_many_interactions.csv'
-=======
->>>>>>> 3907b8ce7af58cdb39e78734f6952fb7243e99db
 
 
 class GMLPDataLoader():
@@ -215,17 +212,6 @@ def get_emb_dataset(col):
     return Data(x=x, edge_index=edge_index)
 
 
-<<<<<<< HEAD
-# get_emb_dateset()
-
-# clean_data(output_samples=output_samples,
-#    output_intereactions=output_interactions,
-#    raw_csv_samples=raw_samples,
-#    raw_csv_interactions=raw_interactions)
-
-
-=======
->>>>>>> 3907b8ce7af58cdb39e78734f6952fb7243e99db
 # draw graph
 def draw_graph(G, pos, node_size, node_color):
     nx.draw_networkx_nodes(
