@@ -105,13 +105,13 @@ def train_model(model, data_loader):
             z, y_hat = model(x)
             # backward
             optimizer.zero_grad()
-            loss = criterion(y_hat, y) + F.mse_loss(y_hat, y) * 100
-            # loss = criterion(y_hat, y)
+            # loss = criterion(y_hat, y) + F.mse_loss(y_hat, y) * 100
+            loss = criterion(y_hat, y)
             loss.backward()
             optimizer.step()
             # accumulate loss and accuracy
             train_loss += loss
-            train_acc += (abs(y - y_hat) < delta).float().mean()
+            # train_acc += (abs(y - y_hat) < delta).float().mean()
             # true_y_hat = F.relu(1 - y_hat / contrasive_loss_m)
             zeros = torch.zeros(y.shape)
             if is_use_gpu:
