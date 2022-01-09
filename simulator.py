@@ -1,50 +1,48 @@
 import numpy as np
-import random
-import csv
-import math
+import pandas as pd
+from scipy.sparse import coo_matrix
 
-smpl_path = './data/sim/samples.csv'
-intr_path = './data/sim/interactions.csv'
+smpl_path = './data/synthetic/samples.csv'
+intr_path = './data/synthetic/interactions.csv'
 
-hub_num = 20
-speicies_num = 2000
-samples_num = 40
-Huge_Enough = 10
+species_num = 200
+hub_num = 10
+sample_num = 40
+
+diagonal_value = 10.
 
 
-def generate_simulated_data(hub_num, speicies_num, samples_num):
+def generate_simulated_data(species_num: int, hub_num: int, sample_num: int):
     """"""
-    mean = np.random.rand(speicies_num)
-    mean -= 1
-    hubs = random.sample(range(speicies_num), hub_num)
-    # 生成协方差矩阵
-    cov = np.zeros([speicies_num, speicies_num])
-    for i in range(speicies_num):
+    # generate the covariance matrix with hub model
+    hubs = np.random.choice(np.arange(species_num), hub_num, replace=False)
+    cov = np.empty([species_num, species_num])
+    for i in range(species_num):
         for j in range(i - 1):
-            if ((i in hubs) or (j in hubs)):
-                cov[i, j] = np.random.choice([0, 0.2], p=[.93, .07])
+            if i in hubs or j in hubs:
+                cov[i, j] = np.random.choice([0., .2], p=[.92, .08])
             else:
-                cov[i, j] = np.random.choice([0, 0.2], p=[.992, .008])
-    cov = cov + cov.T
-    np.fill_diagonal(cov, Huge_Enough)
-    # 获得邻接矩阵
-    adj = np.array(cov, dtype=bool)
-    # 归一化，以得到正定矩阵
-    for co in cov:
-        _range = np.max(co) - np.min(co)
-        co = (co - np.min(co)) / _range
-    # lny 服从多元高斯分布，我们要获得 y
-    otus = np.random.multivariate_normal(mean, cov, (samples_num), 'raise')
-    otus = np.exp(otus)
+                cov[i, j] = np.random.choice([0., .2], p=[.992, .008])
+    cov += cov.T
+    np.fill_diagonal(cov, diagonal_value)
+    # get the otu table
+    mean = np.random.rand(species_num) - .5
+    otus = np.random.multivariate_normal(mean, cov, (sample_num), 'raise')
+    otus = np.exp(otus).T
+    # get the adjacency matrix
+    coo = coo_matrix(cov)
+    interactions = np.vstack((coo.row, coo.col)).T
+    # save data
+    otu_names = np.char.add('OTU', np.arange(species_num).astype(str))
+    otus = np.hstack((otu_names[:, None], otus))
+    df = pd.DataFrame(otus,
+                      columns=['name'] + [f's{i}' for i in range(sample_num)])
+    df.to_csv(smpl_path, index=False)
 
-    with open(smpl_path, 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerows(otus.T)
-    with open(intr_path, 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerows(adj)
+    interactions = np.char.add('OTU', interactions.astype(str))
+    df = pd.DataFrame(interactions, columns=['name1', 'name2'])
+    df.to_csv(intr_path, index=False)
 
 
 if __name__ == '__main__':
-
-    generate_simulated_data(hub_num, speicies_num, samples_num)
+    generate_simulated_data(species_num, hub_num, sample_num)
