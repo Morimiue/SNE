@@ -5,7 +5,7 @@ from scipy.sparse import coo_matrix
 smpl_path = './data/synthetic/samples.csv'
 intr_path = './data/synthetic/interactions.csv'
 
-species_num = 200
+species_num = 1000
 hub_num = 10
 sample_num = 40
 
@@ -16,21 +16,21 @@ def generate_simulated_data(species_num: int, hub_num: int, sample_num: int):
     """"""
     # generate the covariance matrix with hub model
     hubs = np.random.choice(np.arange(species_num), hub_num, replace=False)
-    cov = np.empty([species_num, species_num])
+    adj = np.zeros([species_num, species_num])
     for i in range(species_num):
-        for j in range(i - 1):
+        for j in range(i):
             if i in hubs or j in hubs:
-                cov[i, j] = np.random.choice([0., .2], p=[.92, .08])
+                adj[i, j] = np.random.choice([0., .2], p=[.92, .08])
             else:
-                cov[i, j] = np.random.choice([0., .2], p=[.992, .008])
-    cov += cov.T
+                adj[i, j] = np.random.choice([0., .2], p=[.992, .008])
+    cov = adj + adj.T
     np.fill_diagonal(cov, diagonal_value)
     # get the otu table
     mean = np.random.rand(species_num) - .5
     otus = np.random.multivariate_normal(mean, cov, (sample_num), 'raise')
     otus = np.exp(otus).T
     # get the adjacency matrix
-    coo = coo_matrix(cov)
+    coo = coo_matrix(adj)
     interactions = np.vstack((coo.row, coo.col)).T
     # save data
     otu_names = np.char.add('OTU', np.arange(species_num).astype(str))
