@@ -1,5 +1,3 @@
-import csv
-
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
@@ -194,6 +192,46 @@ def get_cora_dataset(train: bool, col: int = 0) -> Data:
     y_indices = np.vstack((y_sparse.row, y_sparse.col))
     edge_index = torch.LongTensor(y_indices)
     return Data(x=x, edge_index=edge_index)
+
+
+def lsa_pair(List1, List2, N):
+    O1 = List1
+    O2 = List2
+    psm = np.zeros([N + 1, N + 1])
+    nsm = np.zeros([N + 1, N + 1])
+    i = 0
+    j = 0
+    max_s = -1000
+    max_p = [0, 0]
+    flag = 0
+    for i in range(1, N + 1):
+        for j in range(max(1, i - 3), min(N, i + 3) + 1):
+            s1 = O1[i - 1] * O2[j - 1]
+            psm[i][j] = max(0., psm[i - 1][j - 1] + s1)
+            nsm[i][j] = max(0, nsm[i - 1][j - 1] - s1)
+            if psm[i][j] > max_s:
+                max_s = psm[i][j]
+                max_p[0] = i
+                max_p[1] = j
+                flag = 1
+            if nsm[i][j] > max_s:
+                max_s = nsm[i][j]
+                max_p[0] = i
+                max_p[1] = j
+                flag = -1
+    if flag == 1:
+        return max_s / N
+    else:
+        return -1 * max_s / N
+
+
+def lsa(data, D):
+    N = len(data)
+    lss = np.zeros((N, N))
+    for i in range(N):
+        for j in range(N):
+            lss[i][j] = lss_pair(data[i], data[j], len(data[i]))
+    return lss
 
 
 # draw graph

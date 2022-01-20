@@ -9,10 +9,10 @@ from utils import *
 
 model_path = './models/gmlp_model.pth'
 
-raw_smpl_path = './data/real/raw/samples_raw_diabetes.csv'
-raw_intr_path = './data/real/raw/interactions_raw_trrust.csv'
 smpl_path = './data/real/processed/samples_trrust_dia.csv'
 intr_path = './data/real/processed/interactions_trrust_dia.csv'
+# smpl_path = './data/synthetic/samples.csv'
+# intr_path = './data/synthetic/interactions.csv'
 
 feature_size = 16
 batch_size = 512
@@ -39,7 +39,7 @@ class NContrastLoss(nn.Module):
         y_hat = torch.exp(y_hat * tau)
         y_match_sum = torch.sum(y_hat * y, 1)
         y_sum = torch.sum(y_hat, 1)
-        loss = -torch.log(y_match_sum * (y_sum)**(-1) + 1e-8).mean()
+        loss = -torch.log(y_match_sum * y_sum**(-1) + 1e-8).mean()
         return loss
 
 
