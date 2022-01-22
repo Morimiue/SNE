@@ -22,8 +22,55 @@ contrasive_loss_m = 700.
 potential_loss_l = 2.
 
 is_use_gpu = torch.cuda.is_available()
-
 # is_use_gpu = False
+
+
+@torch.no_grad()
+def evaluate_model_only(x, y, model, score_thresh):
+    '''
+    if the p-value is less than the threshold we reject the null-hypothesis,
+    and accept that our judgement is true i.e. these series are correlated
+    '''
+    # initial test statistics
+    torch_x = torch.as_tensor(x, dtype=torch.float32)
+    zeros = torch.zeros(y.shape)
+    if is_use_gpu:
+        torch_x = torch_x.cuda()
+        y_hat = model(torch_x)[1].cpu()
+    else:
+        y_hat = model(torch_x)[1]
+    sne_init_score = torch.maximum(zeros, -(y_hat / potential_loss_l - 1)**2 +
+                                   1).numpy()
+
+    # 设置对角线元素为0,以排除对角线元素干扰
+    n = y.shape[0]
+    y[range(n), range(n)] = 0
+    sne_init_score[range(n), range(n)] = 0
+
+    # 判断是否相关，大于阈值则视为相关，得到相关矩阵
+    sne_cor_matrix = (np.abs(sne_init_score) > score_thresh).astype(float)
+
+    print("计算相关对数……")
+    sne_intr_num = np.count_nonzero(sne_cor_matrix)
+    ground_truth_intr_num = np.count_nonzero(y)
+
+    print('计算真阳性数……')
+    # np.multiply(pcc_cor_matrix, y) 得到对位相乘结果，而 * 不行，离谱
+    sne_true_pos = np.count_nonzero(np.multiply(sne_cor_matrix, y))
+
+    # 计算精确率，此时只需要考虑预测正确，且真的正确的值
+    print('计算精确率……')
+    sne_precision = sne_true_pos / sne_intr_num
+
+    # 计算召回率，此时只需要考虑真的正确，且我们预测正确的值
+    print('计算召回率……')
+    sne_recall = sne_true_pos / ground_truth_intr_num
+
+    print(f'''{"":16}{"SNE":8}{"Ground Truth":12}
+{"Interactions":16}{sne_intr_num:<8}{ground_truth_intr_num:<12}
+{"True Pos":16}{sne_true_pos:<8}
+{"Precision":16}{sne_precision:<8.2%}
+{"Recall":16}{sne_recall:<8.2%}''')
 
 
 @torch.no_grad()
@@ -302,7 +349,10 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(model_path))
     model.eval()
 
-    # # quick evaluate
+    # ---------- super quick evaluate ----------
+    # evaluate_model_only(x, y, model, score_thresh=0.8)
+
+    # ---------- quick evaluate ----------
     # x_tmp = x[:300].copy()
     # y_tmp = y[:300, :300].copy()
     # evaluate_model(x_tmp,
@@ -312,7 +362,7 @@ if __name__ == '__main__':
     #                p_val_thresh=0.1,
     #                score_thresh=0.8)
 
-    # fully evaluate
+    # ---------- fully evaluate ----------
     init_score_list = calculate_init_scores(x, y, model)
     # 5 means methods that in our comparing experiment
     p_sum_list = np.zeros((5, x.shape[0], x.shape[0]))
