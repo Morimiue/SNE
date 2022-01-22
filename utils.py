@@ -194,44 +194,35 @@ def get_cora_dataset(train: bool, col: int = 0) -> Data:
     return Data(x=x, edge_index=edge_index)
 
 
-def lsa_pair(List1, List2, N):
-    O1 = List1
-    O2 = List2
-    psm = np.zeros([N + 1, N + 1])
-    nsm = np.zeros([N + 1, N + 1])
-    i = 0
-    j = 0
-    max_s = -1000
-    max_p = [0, 0]
-    flag = 0
-    for i in range(1, N + 1):
-        for j in range(max(1, i - 3), min(N, i + 3) + 1):
-            s1 = O1[i - 1] * O2[j - 1]
-            psm[i][j] = max(0., psm[i - 1][j - 1] + s1)
-            nsm[i][j] = max(0, nsm[i - 1][j - 1] - s1)
-            if psm[i][j] > max_s:
-                max_s = psm[i][j]
-                max_p[0] = i
-                max_p[1] = j
-                flag = 1
-            if nsm[i][j] > max_s:
-                max_s = nsm[i][j]
-                max_p[0] = i
-                max_p[1] = j
-                flag = -1
-    if flag == 1:
-        return max_s / N
-    else:
-        return -1 * max_s / N
+def lsa_pair(o1, o2, D):
+    N = len(o1)
+    o1 = o1.reshape(-1, 1)
+    o2 = o2.reshape(1, -1)
+    dot_product = np.dot(o1, o2)
+    psm = np.zeros([N, N])
+    nsm = np.zeros([N, N])
+    for i in range(N):
+        for j in range(N):
+            if abs(i - j) <= D:
+                psm[i][j] = max(0, psm[i - 1][j - 1] + dot_product[i][j])
+                nsm[i][j] = max(0, nsm[i - 1][j - 1] - dot_product[i][j])
+    max_p = psm.max()
+    max_n = nsm.max()
+    max_score = max(max_p, max_n)
+    flag = np.sign(max_p - max_n)
+    return flag * max_score / N
 
 
 def lsa(data, D):
     N = len(data)
-    lss = np.zeros((N, N))
+    lsa = np.zeros((N, N))
     for i in range(N):
-        for j in range(N):
-            lss[i][j] = lss_pair(data[i], data[j], len(data[i]))
-    return lss
+        for j in range(i):
+            lsa[i][j] = lsa_pair(data[i], data[j], D)
+    lsa = lsa + lsa.T
+    for i in range(N):
+        lsa[i][i] = lsa_pair(data[i], data[i], D)
+    return lsa
 
 
 # draw graph
