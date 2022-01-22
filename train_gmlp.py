@@ -14,9 +14,9 @@ intr_path = './data/real/processed/interactions_trrust_dia.csv'
 # smpl_path = './data/synthetic/samples.csv'
 # intr_path = './data/synthetic/interactions.csv'
 
-feature_size = 16
+feature_size = 1433
 batch_size = 512
-epoch_num = 200
+epoch_num = 2000
 contrasive_loss_m = 700.
 potential_loss_l = 2.
 potential_loss_k = 3.
@@ -92,6 +92,8 @@ def train_model(model, data_loader):
         # initialize loss and accuracy
         train_loss = 0.
         train_acc = 0.
+        train_precision = 0.
+        train_recall = 0.
 
         # train on batches
         for _, data in enumerate(data_loader):
@@ -118,7 +120,15 @@ def train_model(model, data_loader):
                 zeros = zeros.cuda()
             true_y_hat = torch.maximum(zeros,
                                        -(y_hat / potential_loss_l - 1)**2 + 1)
-            train_acc += (abs(y - true_y_hat) < delta).float().mean()
+            # precision
+            cor_matrix = (np.abs(true_y_hat.cpu().detach().numpy()) >
+                          0.8).astype(float)
+            intr_num = np.count_nonzero(cor_matrix)
+            true_pos = np.count_nonzero(np.multiply(cor_matrix, y.cpu()))
+            if intr_num != 0:
+                train_precision += true_pos / intr_num
+            ground_truth_intr_num = np.count_nonzero(y.cpu())
+            train_recall += true_pos / ground_truth_intr_num
 
         # get loss and accuracy of this epoch
         loader_step = len(data_loader)
@@ -128,7 +138,7 @@ def train_model(model, data_loader):
         # print training stats
         if epoch == 0 or (epoch + 1) % 10 == 0:
             print(
-                f'--- Epoch: {epoch+1}, Loss: {train_loss:.6f}, Acc: {train_acc:.6f}'
+                f'--- Epoch: {epoch+1}, Loss: {train_loss:.6f}, Precision: {train_precision:.6f}, Recall: {train_recall:.6f}'
             )
 
         # print some data for debug
@@ -144,8 +154,8 @@ def train_model(model, data_loader):
 
 
 if __name__ == '__main__':
-    train_data = get_dataset(smpl_path, intr_path, feature_size)
-    # train_data = get_cora_dataset(train=True)
+    # train_data = get_dataset(smpl_path, intr_path, feature_size)
+    train_data = get_cora_dataset(train=True)
 
     data_loader = GMLPDataLoader(data=train_data,
                                  batch_size=batch_size,
