@@ -7,7 +7,6 @@ from scipy.sparse import coo_matrix
 from torch.utils.data import DataLoader, TensorDataset
 from torch_geometric.data import Data
 from torch_geometric.datasets import Planetoid
-from torch_sparse import tensor
 
 
 class GMLPDataLoader():
@@ -156,6 +155,8 @@ def get_dataset(smpl_path: str, intr_path: str, col: int = 0) -> Data:
                                   dtype=torch.int32)
 
     edge_index = torch.vstack((gene1_index, gene2_index))
+    reversed_edge_index = torch.vstack((gene2_index, gene1_index))
+    edge_index = torch.hstack((edge_index, reversed_edge_index))
 
     print('get dataset done')
     print('x.shape', x.shape)
@@ -194,7 +195,7 @@ def get_cora_dataset(train: bool, col: int = 0) -> Data:
     return Data(x=x, edge_index=edge_index)
 
 
-def lsa_pair(o1, o2, D):
+def _lsa_pair(o1, o2, D):
     N = len(o1)
     o1 = o1.reshape(-1, 1)
     o2 = o2.reshape(1, -1)
@@ -218,11 +219,40 @@ def lsa(data, D):
     lsa = np.zeros((N, N))
     for i in range(N):
         for j in range(i):
-            lsa[i][j] = lsa_pair(data[i], data[j], D)
+            lsa[i][j] = _lsa_pair(data[i], data[j], D)
     lsa = lsa + lsa.T
     for i in range(N):
-        lsa[i][i] = lsa_pair(data[i], data[i], D)
+        lsa[i][i] = _lsa_pair(data[i], data[i], D)
     return lsa
+
+
+def get_triu_items(m: torch.Tensor) -> torch.Tensor:
+    """Get upper triangular items.
+
+    Args:
+        m (torch.Tensor): Matrix.
+
+    Returns:
+        torch.Tensor: A one-dimensional tensor of all the items in the upper triangular part of the matrix. If input has shape N * N then the output will have shape 1/2 N (N-1).
+    """
+    i, j = torch.triu_indices(m.shape[0], m.shape[1], 1)
+    return m[i, j]
+
+
+def save_dense_to_interactions(m: np.ndarray, path: str) -> None:
+    """Convert an adjacency matrix to paired interactions and save to csv.
+
+    Args:
+        m (np.ndarray): Adjacency matrix.
+        path (str): Path of the output file.
+    """
+    # get OTU pair
+    coo = coo_matrix(m)
+    interactions = np.vstack((coo.row, coo.col)).T
+    # save data
+    interactions = np.char.add('OTU', interactions.astype(str))
+    df = pd.DataFrame(interactions, columns=['name1', 'name2'])
+    df.to_csv(path, index=False)
 
 
 # draw graph

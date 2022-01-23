@@ -1,6 +1,3 @@
-from math import perm
-import pickle
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -16,13 +13,15 @@ model_path = './models/gmlp_model.pth'
 
 smpl_path = './data/real/processed/samples_trrust_tb.csv'
 intr_path = './data/real/processed/interactions_trrust_tb.csv'
+# smpl_path = './data/synthetic/samples.csv'
+# intr_path = './data/synthetic/interactions.csv'
 
-feature_size = 16
-contrasive_loss_m = 700.
-potential_loss_l = 2.
+feature_size = 40
+contrasive_loss_m = 10.
+potential_loss_l = 10.
 
 is_use_gpu = torch.cuda.is_available()
-# is_use_gpu = False
+is_use_gpu = False
 
 
 @torch.no_grad()
@@ -43,9 +42,15 @@ def evaluate_model_only(x, y, model, score_thresh):
                                    1).numpy()
 
     # 设置对角线元素为0,以排除对角线元素干扰
-    n = y.shape[0]
-    y[range(n), range(n)] = 0
-    sne_init_score[range(n), range(n)] = 0
+    # np.fill_diagonal(y, 0.)
+    # np.fill_diagonal(sne_init_score, 0.)
+
+    save_dense_to_interactions(sne_init_score,
+                               './data/predicted/interactions.csv')
+
+    # use upper triangular matrix to calculate
+    y = get_triu_items(y)
+    sne_init_score = get_triu_items(sne_init_score)
 
     # 判断是否相关，大于阈值则视为相关，得到相关矩阵
     sne_cor_matrix = (np.abs(sne_init_score) > score_thresh).astype(float)
@@ -350,7 +355,7 @@ if __name__ == '__main__':
     model.eval()
 
     # ---------- super quick evaluate ----------
-    # evaluate_model_only(x, y, model, score_thresh=0.8)
+    evaluate_model_only(x, y, model, score_thresh=0.)
 
     # ---------- quick evaluate ----------
     # x_tmp = x[:300].copy()
@@ -363,18 +368,18 @@ if __name__ == '__main__':
     #                score_thresh=0.8)
 
     # ---------- fully evaluate ----------
-    init_score_list = calculate_init_scores(x, y, model)
-    # 5 means methods that in our comparing experiment
-    p_sum_list = np.zeros((5, x.shape[0], x.shape[0]))
-    batch_of_perm = 10
-    batchsize_of_perm = 3
-    for i in range(batch_of_perm):
-        p_sum_list = calculate_p_in_batches(x, batchsize_of_perm, model,
-                                            init_score_list, p_sum_list)
-        print(f'{i*batch_of_perm}th computation done')
-    # with open('p_value/scores.pkl', 'wb') as f:
-    #     pickle.dump(p_sum_list, f)
-    # with open('p_value/scores.pkl', 'rb') as f:
-    #     p_sum_list = pickle.load(f)
-    evaluate_all_batches(0.1, 0.8, init_score_list, p_sum_list,
-                         batch_of_perm * batchsize_of_perm)
+    # init_score_list = calculate_init_scores(x, y, model)
+    # # 5 means methods that in our comparing experiment
+    # p_sum_list = np.zeros((5, x.shape[0], x.shape[0]))
+    # batch_of_perm = 10
+    # batchsize_of_perm = 3
+    # for i in range(batch_of_perm):
+    #     p_sum_list = calculate_p_in_batches(x, batchsize_of_perm, model,
+    #                                         init_score_list, p_sum_list)
+    #     print(f'{i*batch_of_perm}th computation done')
+    # # with open('p_value/scores.pkl', 'wb') as f:
+    # #     pickle.dump(p_sum_list, f)
+    # # with open('p_value/scores.pkl', 'rb') as f:
+    # #     p_sum_list = pickle.load(f)
+    # evaluate_all_batches(0.1, 0.8, init_score_list, p_sum_list,
+    #                      batch_of_perm * batchsize_of_perm)

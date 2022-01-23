@@ -14,12 +14,12 @@ intr_path = './data/real/processed/interactions_trrust_dia.csv'
 # smpl_path = './data/synthetic/samples.csv'
 # intr_path = './data/synthetic/interactions.csv'
 
-feature_size = 1433
+feature_size = 40
 batch_size = 512
-epoch_num = 2000
-contrasive_loss_m = 700.
-potential_loss_l = 2.
-potential_loss_k = 3.
+epoch_num = 100
+contrasive_loss_m = 10.
+potential_loss_l = 10.
+potential_loss_k = 100.
 learning_rate = 1e-4
 weight_decay = 1e-3
 delta = 0.10
@@ -99,8 +99,7 @@ def train_model(model, data_loader):
         for _, data in enumerate(data_loader):
             # get batch
             x, y = data
-            i, j = torch.triu_indices(y.shape[0], y.shape[1], 1)
-            y = y[i, j]
+            y = get_triu_items(y)
             if is_use_gpu:
                 x, y = x.cuda(), y.cuda()
             # forward
@@ -122,13 +121,13 @@ def train_model(model, data_loader):
                                        -(y_hat / potential_loss_l - 1)**2 + 1)
             # precision
             cor_matrix = (np.abs(true_y_hat.cpu().detach().numpy()) >
-                          0.8).astype(float)
+                          0.).astype(float)
             intr_num = np.count_nonzero(cor_matrix)
             true_pos = np.count_nonzero(np.multiply(cor_matrix, y.cpu()))
             if intr_num != 0:
-                train_precision += true_pos / intr_num
+                train_precision = true_pos / intr_num
             ground_truth_intr_num = np.count_nonzero(y.cpu())
-            train_recall += true_pos / ground_truth_intr_num
+            train_recall = true_pos / ground_truth_intr_num
 
         # get loss and accuracy of this epoch
         loader_step = len(data_loader)
@@ -138,7 +137,7 @@ def train_model(model, data_loader):
         # print training stats
         if epoch == 0 or (epoch + 1) % 10 == 0:
             print(
-                f'--- Epoch: {epoch+1}, Loss: {train_loss:.6f}, Precision: {train_precision:.6f}, Recall: {train_recall:.6f}'
+                f'--- Epoch: {epoch+1:4d}, Loss: {train_loss:.6f}, Interations: {intr_num:6d}, True Pos :{true_pos:6d}, Precision: {train_precision:.2%}, Recall: {train_recall:.2%}'
             )
 
         # print some data for debug
@@ -154,8 +153,8 @@ def train_model(model, data_loader):
 
 
 if __name__ == '__main__':
-    # train_data = get_dataset(smpl_path, intr_path, feature_size)
-    train_data = get_cora_dataset(train=True)
+    train_data = get_dataset(smpl_path, intr_path, feature_size)
+    # train_data = get_cora_dataset(train=True)
 
     data_loader = GMLPDataLoader(data=train_data,
                                  batch_size=batch_size,
