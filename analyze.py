@@ -1,3 +1,4 @@
+from itertools import count
 import numpy as np
 import torch
 import torch.nn as nn
@@ -213,6 +214,9 @@ def evaluate_all_batches(p_val_thresh,
                          in_path='p_value/scores.pkl'):
     # compute p values
     p_list = p_sum_list / perm_num
+    # count for the histogram
+    sne_p = p_list[2]
+    count_of_p, _ = np.histogram(sne_p, [0, 0.2, 0.4, 0.6, 0.8, 1])
     # the element with p value less than the threshold
     init_score_list *= (p_list < p_val_thresh)
     # 判断是否相关，大于阈值则视为相关，得到相关矩阵
@@ -368,18 +372,23 @@ if __name__ == '__main__':
     #                score_thresh=0.8)
 
     # ---------- fully evaluate ----------
-    # init_score_list = calculate_init_scores(x, y, model)
-    # # 5 means methods that in our comparing experiment
-    # p_sum_list = np.zeros((5, x.shape[0], x.shape[0]))
-    # batch_of_perm = 10
-    # batchsize_of_perm = 3
-    # for i in range(batch_of_perm):
-    #     p_sum_list = calculate_p_in_batches(x, batchsize_of_perm, model,
-    #                                         init_score_list, p_sum_list)
-    #     print(f'{i*batch_of_perm}th computation done')
-    # # with open('p_value/scores.pkl', 'wb') as f:
-    # #     pickle.dump(p_sum_list, f)
-    # # with open('p_value/scores.pkl', 'rb') as f:
-    # #     p_sum_list = pickle.load(f)
-    # evaluate_all_batches(0.1, 0.8, init_score_list, p_sum_list,
-    #                      batch_of_perm * batchsize_of_perm)
+    init_score_list = calculate_init_scores(x, y, model)
+    # 5 means methods that in our comparing experiment
+    p_sum_list = np.zeros((5, x.shape[0], x.shape[0]))
+    batch_of_perm = 10
+    batchsize_of_perm = 3
+    for i in range(batch_of_perm):
+        p_sum_list = calculate_p_in_batches(x, batchsize_of_perm, model,
+                                            init_score_list, p_sum_list)
+        print(f'{i*batch_of_perm}th computation done')
+    p_list = p_sum_list / batch_of_perm * batchsize_of_perm
+    p_90 = np.count_nonzero(p_list[2] < 0.1)
+    p_95 = np.count_nonzero(p_list[2] < 0.05)
+    p_99 = np.count_nonzero(p_list[2] < 0.01)
+    p_num_list = np.asarray((p_90, p_95, p_99))
+    # with open('p_value/scores.pkl', 'wb') as f:
+    #     pickle.dump(p_sum_list, f)
+    # with open('p_value/scores.pkl', 'rb') as f:
+    #     p_sum_list = pickle.load(f)
+    evaluate_all_batches(0.1, 0.8, init_score_list, p_sum_list,
+                         batch_of_perm * batchsize_of_perm)
