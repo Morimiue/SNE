@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
@@ -14,7 +16,7 @@ class GMLPDataLoader():
                  data: Data,
                  batch_size: int,
                  shuffle: bool = False,
-                 drop_last: bool = False):
+                 drop_last: bool = False) -> None:
         self.x = data.x.type(torch.float32)
         self.y = torch.sparse_coo_tensor(data.edge_index,
                                          torch.ones(data.edge_index.shape[1]),
@@ -30,14 +32,14 @@ class GMLPDataLoader():
             self.sample_num = (len(self.x) + self.batch_size -
                                1) // self.batch_size
 
-    def __iter__(self):
+    def __iter__(self) -> tuple[torch.Tensor, torch.Tensor]:
         for _ in range(self.sample_num):
             random_index = torch.randperm(len(self.x))[:self.batch_size]
             x_batch = self.x[random_index]
             y_batch = self.y[random_index, :][:, random_index]
             yield x_batch, y_batch
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.sample_num
 
 
@@ -193,37 +195,6 @@ def get_cora_dataset(train: bool, col: int = 0) -> Data:
     y_indices = np.vstack((y_sparse.row, y_sparse.col))
     edge_index = torch.LongTensor(y_indices)
     return Data(x=x, edge_index=edge_index)
-
-
-def _lsa_pair(o1, o2, D):
-    N = len(o1)
-    o1 = o1.reshape(-1, 1)
-    o2 = o2.reshape(1, -1)
-    dot_product = np.dot(o1, o2)
-    psm = np.zeros([N, N])
-    nsm = np.zeros([N, N])
-    for i in range(N):
-        for j in range(N):
-            if abs(i - j) <= D:
-                psm[i][j] = max(0, psm[i - 1][j - 1] + dot_product[i][j])
-                nsm[i][j] = max(0, nsm[i - 1][j - 1] - dot_product[i][j])
-    max_p = psm.max()
-    max_n = nsm.max()
-    max_score = max(max_p, max_n)
-    flag = np.sign(max_p - max_n)
-    return flag * max_score / N
-
-
-def lsa(data, D):
-    N = len(data)
-    lsa = np.zeros((N, N))
-    for i in range(N):
-        for j in range(i):
-            lsa[i][j] = _lsa_pair(data[i], data[j], D)
-    lsa = lsa + lsa.T
-    for i in range(N):
-        lsa[i][i] = _lsa_pair(data[i], data[i], D)
-    return lsa
 
 
 def get_triu_items(m: torch.Tensor) -> torch.Tensor:

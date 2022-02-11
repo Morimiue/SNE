@@ -24,25 +24,74 @@ is_use_gpu = torch.cuda.is_available()
 is_use_gpu = False
 
 
-@torch.no_grad()
-def predict(x, y, model, score_thresh):
-    '''
-    if the p-value is less than the threshold we reject the null-hypothesis,
-    and accept that our judgement is true i.e. these series are correlated
-    '''
-    # initial test statistics
+def sne(x):
     torch_x = torch.as_tensor(x, dtype=torch.float32)
-    zeros = torch.zeros(1)
     if is_use_gpu:
         torch_x = torch_x.cuda()
         y_hat = model(torch_x)[1].cpu()
     else:
         y_hat = model(torch_x)[1]
-    sne_init_score = torch.maximum(zeros, -(y_hat / potential_loss_l - 1)**2 +
-                                   1).numpy()
+    zeros = torch.zeros(1)
+    return torch.maximum(zeros, -(y_hat / potential_loss_l - 1)**2 + 1).numpy()
 
-    np.fill_diagonal(y, np.nan)
-    np.fill_diagonal(sne_init_score, np.nan)
+
+def pcc(x):
+    return np.corrcoef(x)
+
+
+def spm(x):
+    return spearmanr(x, axis=1)[0]
+
+
+def _lss_pair(o1: np.ndarray, o2: np.ndarray, D: int) -> float:
+    N = len(o1)
+    o1 = o1.reshape(-1, 1)
+    o2 = o2.reshape(1, -1)
+    dot_product = np.dot(o1, o2)
+    psm = np.zeros([N, N])
+    nsm = np.zeros([N, N])
+    for i in range(N):
+        for j in range(N):
+            if abs(i - j) <= D:
+                psm[i][j] = max(0, psm[i - 1][j - 1] + dot_product[i][j])
+                nsm[i][j] = max(0, nsm[i - 1][j - 1] - dot_product[i][j])
+    max_p = psm.max()
+    max_n = nsm.max()
+    max_score = max(max_p, max_n)
+    flag = np.sign(max_p - max_n)
+    return flag * max_score / N
+
+
+def lss(data: np.ndarray, D: int) -> np.ndarray:
+    N = len(data)
+    res = np.zeros((N, N))
+    for i in range(N):
+        for j in range(i):
+            res[i][j] = _lss_pair(data[i], data[j], D)
+    res = res + res.T
+    for i in range(N):
+        res[i][i] = _lss_pair(data[i], data[i], D)
+    return res
+
+
+def lsa(x):
+    return np.corrcoef(x)
+    return lss(x, 3)
+
+
+def mic(x):
+    return np.corrcoef(x)
+    return cstats(x, x, alpha=0.6, c=15, est="mic_e")[0]
+
+
+@torch.no_grad()
+def predict(x, y, score_thresh):
+    '''
+    if the p-value is less than the threshold we reject the null-hypothesis,
+    and accept that our judgement is true i.e. these series are correlated
+    '''
+    # initial test statistics
+    sne_init_score = sne(x)
 
     save_dense_to_interactions(sne_init_score,
                                './data/predicted/interactions.csv')
@@ -52,7 +101,7 @@ def predict(x, y, model, score_thresh):
     sne_init_score = get_triu_items(sne_init_score)
 
     # 判断是否相关，大于阈值则视为相关，得到相关矩阵
-    sne_cor_matrix = (np.abs(sne_init_score) > score_thresh).astype(float)
+    sne_cor_matrix = np.abs(sne_init_score) > score_thresh
 
     print("计算相关对数……")
     sne_intr_num = np.count_nonzero(sne_cor_matrix)
@@ -78,28 +127,19 @@ def predict(x, y, model, score_thresh):
 
 
 @torch.no_grad()
-def predict_and_compare(x, y, model, perm_num, p_val_thresh, score_thresh):
+def predict_and_compare(x, y, perm_num, p_val_thresh, score_thresh):
     '''
     if the p-value is less than the threshold we reject the null-hypothesis,
     and accept that our judgement is true i.e. these series are correlated
     '''
     # initial test statistics
-    torch_x = torch.as_tensor(x, dtype=torch.float32)
-    zeros = torch.zeros(1)
-    if is_use_gpu:
-        torch_x = torch_x.cuda()
-        y_hat = model(torch_x)[1].cpu()
-    else:
-        y_hat = model(torch_x)[1]
-    sne_init_score = torch.maximum(zeros, -(y_hat / potential_loss_l - 1)**2 +
-                                   1).numpy()
-    pcc_init_score = np.corrcoef(x)
-    spm_init_score = spearmanr(x, axis=1)[0]
-    # lsa_init_score = lsa(x, 3)
-    lsa_init_score = np.corrcoef(x)
-    # mic_init_score, _ = cstats(x, x, alpha=0.6, c=15, est="mic_e")
-    mic_init_score = np.corrcoef(x)
+    sne_init_score = sne(x)
+    pcc_init_score = pcc(x)
+    spm_init_score = spm(x)
+    lsa_init_score = lsa(x)
+    mic_init_score = mic(x)
 
+    np.fill_diagonal(y, 0.)
     np.fill_diagonal(sne_init_score, np.nan)
     np.fill_diagonal(pcc_init_score, np.nan)
     np.fill_diagonal(spm_init_score, np.nan)
@@ -114,20 +154,11 @@ def predict_and_compare(x, y, model, perm_num, p_val_thresh, score_thresh):
     mic_p_count = 0
     for i in range(perm_num):
         x = np.apply_along_axis(np.random.permutation, axis=1, arr=x)
-        torch_x = torch.as_tensor(x, dtype=torch.float32)
-        if is_use_gpu:
-            torch_x = torch_x.cuda()
-            y_hat = model(torch_x)[1].cpu()
-        else:
-            y_hat = model(torch_x)[1]
-        sne_perm_score = torch.maximum(
-            zeros, -(y_hat / potential_loss_l - 1)**2 + 1).numpy()
-        pcc_perm_score = np.corrcoef(x)
-        spm_perm_score = spearmanr(x, axis=1)[0]
-        # lsa_perm_score = lsa(x, 3)
-        lsa_perm_score = np.corrcoef(x)
-        # mic_perm_score, _ = cstats(x, x, alpha=0.6, c=15, est="mic_e")
-        mic_perm_score = np.corrcoef(x)
+        sne_perm_score = sne(x)
+        pcc_perm_score = pcc(x)
+        spm_perm_score = spm(x)
+        lsa_perm_score = lsa(x)
+        mic_perm_score = mic(x)
 
         sne_p_count += np.abs(sne_perm_score) > np.abs(sne_init_score)
         pcc_p_count += np.abs(pcc_perm_score) > np.abs(pcc_init_score)
@@ -145,8 +176,6 @@ def predict_and_compare(x, y, model, perm_num, p_val_thresh, score_thresh):
     lsa_p = lsa_p_count / perm_num
     mic_p = mic_p_count / perm_num
 
-    np.savetxt('test.txt', sne_p, fmt='%.2f', delimiter=',')
-
     # the elements with p value less than the threshold
     sne_init_score *= (sne_p < p_val_thresh)
     pcc_init_score *= (pcc_p < p_val_thresh)
@@ -155,11 +184,11 @@ def predict_and_compare(x, y, model, perm_num, p_val_thresh, score_thresh):
     mic_init_score *= (mic_p < p_val_thresh)
 
     # 判断是否相关，大于阈值则视为相关，得到相关矩阵
-    sne_cor_matrix = (np.abs(sne_init_score) > score_thresh).astype(float)
-    pcc_cor_matrix = (np.abs(pcc_init_score) > score_thresh).astype(float)
-    spm_cor_matrix = (np.abs(spm_init_score) > score_thresh).astype(float)
-    lsa_cor_matrix = (np.abs(lsa_init_score) > score_thresh).astype(float)
-    mic_cor_matrix = (np.abs(mic_init_score) > score_thresh).astype(float)
+    sne_cor_matrix = np.abs(sne_init_score) > score_thresh
+    pcc_cor_matrix = np.abs(pcc_init_score) > score_thresh
+    spm_cor_matrix = np.abs(spm_init_score) > score_thresh
+    lsa_cor_matrix = np.abs(lsa_init_score) > score_thresh
+    mic_cor_matrix = np.abs(mic_init_score) > score_thresh
 
     print("计算相关对数……")
     sne_intr_num = np.count_nonzero(sne_cor_matrix)
