@@ -60,7 +60,7 @@ def clean_data(in_smpl_path: str, in_intr_path: str, out_smpl_path: str,
 
     # keep only the rows with at least n non-zero values
     samples_df = samples_df.replace(0, np.nan)
-    samples_df = samples_df.dropna(thresh=7)
+    samples_df = samples_df.dropna(thresh=samples_df.shape[1] // 2)
     samples_df = samples_df.replace(np.nan, 0)
 
     # get intersection of genes
@@ -127,7 +127,7 @@ def clean_data(in_smpl_path: str, in_intr_path: str, out_smpl_path: str,
                                           index=False)
 
 
-def get_dataset(smpl_path: str, intr_path: str, col: int = 0) -> Data:
+def get_dataset(smpl_path: str, intr_path: str = None, col: int = 0) -> Data:
     """Generate dataset from csv files.
 
     Args:
@@ -139,7 +139,6 @@ def get_dataset(smpl_path: str, intr_path: str, col: int = 0) -> Data:
         Data: Data.
     """
     samples_df = pd.read_csv(smpl_path)
-    interactions_df = pd.read_csv(intr_path)
 
     if col:
         x = samples_df.iloc[:, 1:col + 1].to_numpy(dtype=np.float32)
@@ -147,23 +146,30 @@ def get_dataset(smpl_path: str, intr_path: str, col: int = 0) -> Data:
         x = samples_df.iloc[:, 1:].to_numpy(dtype=np.float32)
     x = torch.as_tensor(x, dtype=torch.float32)
 
-    gene_names = samples_df.iloc[:, 0].to_list()
-    gene1 = interactions_df.iloc[:, 0].to_list()
-    gene2 = interactions_df.iloc[:, 1].to_list()
+    node_names = samples_df.iloc[:, 0].to_list()
 
-    gene1_index = torch.as_tensor([gene_names.index(i) for i in gene1],
-                                  dtype=torch.int32)
-    gene2_index = torch.as_tensor([gene_names.index(i) for i in gene2],
-                                  dtype=torch.int32)
-
-    edge_index = torch.vstack((gene1_index, gene2_index))
-    reversed_edge_index = torch.vstack((gene2_index, gene1_index))
-    edge_index = torch.hstack((edge_index, reversed_edge_index))
-
-    print('get dataset done')
     print('x.shape', x.shape)
-    print('edge_index.shape', edge_index.shape)
-    return Data(x=x, edge_index=edge_index)
+
+    if intr_path:
+        interactions_df = pd.read_csv(intr_path)
+
+        node1 = interactions_df.iloc[:, 0].to_list()
+        node2 = interactions_df.iloc[:, 1].to_list()
+
+        node1_index = torch.as_tensor([node_names.index(i) for i in node1],
+                                      dtype=torch.int32)
+        node2_index = torch.as_tensor([node_names.index(i) for i in node2],
+                                      dtype=torch.int32)
+
+        edge_index = torch.vstack((node1_index, node2_index))
+        reversed_edge_index = torch.vstack((node2_index, node1_index))
+        edge_index = torch.hstack((edge_index, reversed_edge_index))
+
+        print('edge_index.shape', edge_index.shape)
+    else:
+        edge_index = None
+
+    return Data(x=x, edge_index=edge_index, node_names=np.asarray(node_names))
 
 
 # get dataset
@@ -210,7 +216,9 @@ def get_triu_items(m: torch.Tensor) -> torch.Tensor:
     return m[i, j]
 
 
-def save_dense_to_interactions(m: np.ndarray, path: str) -> None:
+def save_dense_to_interactions(m: np.ndarray,
+                               path: str,
+                               node_names: np.ndarray = None) -> None:
     """Convert an adjacency matrix to paired interactions and save to csv.
 
     Args:
@@ -221,7 +229,10 @@ def save_dense_to_interactions(m: np.ndarray, path: str) -> None:
     coo = coo_matrix(m)
     interactions = np.vstack((coo.row, coo.col)).T
     # save data
-    interactions = np.char.add('OTU', interactions.astype(str))
+    if node_names is not None:
+        interactions = node_names[interactions]
+    else:
+        interactions = np.char.add('OTU', interactions.astype(str))
     df = pd.DataFrame(interactions, columns=['name1', 'name2'])
     df.to_csv(path, index=False)
 
