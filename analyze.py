@@ -7,25 +7,30 @@ import torch.nn.functional as F
 from minepy import cstats, pstats
 from scipy.sparse import coo_matrix
 from scipy.stats import spearmanr
+from sklearn.metrics.pairwise import euclidean_distances
 
 from model_gmlp import GMLPModel as Model
 from utils import *
 
-model_path = './models/gmlp_model.pth'
+model_path = './models/gmlp_model_sim.pth'
+smpl_path = './data/synthetic/samples2.csv'
+intr_path = './data/synthetic/interactions2.csv'
+results_dir_path = './data/inference_sim/'
 
-smpl_path = './data/real/processed/samples_trrust_tb.csv'
-intr_path = './data/real/processed/interactions_trrust_tb.csv'
-# smpl_path = './data/synthetic/samples.csv'
-# intr_path = './data/synthetic/interactions.csv'
+# model_path = './models/gmlp_model_sim.pth'
+# smpl_path = './data/real/processed/samples_trrust_tb.csv'
+# intr_path = './data/real/processed/interactions_trrust_tb.csv'
+# results_dir_path = './data/inference_gene/'
 
-results_dir_path = './data/inference/'
+# model_path = './models/gmlp_model_sim_675.pth'
+# smpl_path = './data/microbiome/microbiome2.csv'
+# results_dir_path = './data/inference_microb/'
 
 feature_size = 40
 contrasive_loss_m = 10.
 potential_loss_l = 10.
 
-# is_use_gpu = torch.cuda.is_available()
-is_use_gpu = False
+is_use_gpu = torch.cuda.is_available()
 is_save_results = True
 
 
@@ -33,11 +38,11 @@ def sne(x):
     torch_x = torch.as_tensor(x, dtype=torch.float32)
     if is_use_gpu:
         torch_x = torch_x.cuda()
-        y_hat = model(torch_x)[1].cpu()
+        y_hat = model(torch_x).cpu().detach().numpy()
     else:
-        y_hat = model(torch_x)[1]
-    zeros = torch.zeros(1)
-    return torch.maximum(zeros, -(y_hat / potential_loss_l - 1)**2 + 1).numpy()
+        y_hat = model(torch_x).detach().numpy()
+    y_hat = euclidean_distances(y_hat)
+    return np.maximum(0., -(y_hat / potential_loss_l - 1)**2 + 1)
 
 
 def pcc(x):
@@ -88,10 +93,80 @@ def mic(x):
 
 
 @torch.no_grad()
+def predict(x: np.ndarray,
+            score_thresh: float = 0.8,
+            p_val_thresh: float = 0.05,
+            perm_num: int = 0) -> None:
+    '''
+    if the p-value is less than the threshold we reject the null-hypothesis,
+    and accept that our judgement is true i.e. these series are correlated
+    '''
+
+    init_scores = np.empty((len(x), len(x)))
+    if perm_num > 0:
+        perm_scores = np.empty((len(x), len(x)))
+        p_values = np.zeros((len(x), len(x)))
+    cor_matrixs = np.empty((len(x), len(x)))
+    cor_matrixs_top = np.zeros((len(x), len(x)))
+
+    # initial test statistics
+    init_scores = sne(x)
+    np.fill_diagonal(init_scores, np.nan)
+
+    # permutated statistics
+    if perm_num > 0:
+        for i in range(perm_num):
+            x = np.apply_along_axis(np.random.permutation, axis=1, arr=x)
+            perm_scores = sne(x)
+            p_values += np.abs(perm_scores) > np.abs(init_scores)
+            print(f'permutation test: {i+1} / {perm_num}', end='\r')
+        p_values /= perm_num
+
+    # compute the correlation matrix
+    if perm_num > 0:
+        init_scores = np.multiply(init_scores, p_values <= p_val_thresh)
+
+    if perm_num > 0:
+        cor_matrixs = np.multiply(
+            np.abs(init_scores) >= score_thresh, p_values <= p_val_thresh)
+    else:
+        cor_matrixs = np.abs(init_scores) >= score_thresh
+    intr_counts = np.count_nonzero(cor_matrixs)
+
+    np.fill_diagonal(init_scores, 0.)
+    init_scores[np.tril_indices_from(init_scores, -1000)] = 0.
+    xs, ys = np.unravel_index(
+        np.argsort(init_scores.ravel())[-1000:], init_scores.shape)
+    for i in range(len(xs)):
+        cor_matrixs_top[xs[i]][ys[i]] = init_scores[xs[i]][ys[i]]
+
+    # save results
+    print(intr_counts)
+    if is_save_results:
+        np.save(results_dir_path + 'init_scores.npy', init_scores)
+        np.save(results_dir_path + 'cor_matrixs_top.npy', cor_matrixs_top)
+
+        if perm_num:
+            p_counts = np.empty(10, dtype=np.int_)
+            for i in range(10):
+                p_counts[i] = np.count_nonzero(p_values < (i + 1) / 10)
+            for i in range(10 - 1, 0, -1):
+                p_counts[i] -= p_counts[i - 1]
+
+            np.save(results_dir_path + 'p_values.npy', p_values)
+            np.save(results_dir_path + 'p_counts.npy', p_counts)
+            np.savetxt(results_dir_path + 'p_counts.txt', p_counts, fmt='%d')
+
+        save_dense_to_interactions(cor_matrixs_top,
+                                   node_names=node_names,
+                                   path=results_dir_path + 'interactions.csv')
+
+
+@torch.no_grad()
 def predict_and_compare(x: np.ndarray,
                         y: np.ndarray,
                         methods: tuple[function, ...],
-                        score_thresh: float,
+                        score_thresh: tuple[float, ...],
                         p_val_thresh: float = 0.05,
                         perm_num: int = 0) -> None:
     '''
@@ -132,10 +207,10 @@ def predict_and_compare(x: np.ndarray,
     for i in range(len(methods)):
         if perm_num > 0:
             cor_matrixs[i] = np.multiply(
-                np.abs(init_scores[i]) >= score_thresh,
+                np.abs(init_scores[i]) >= score_thresh[i],
                 p_values[i] <= p_val_thresh)
         else:
-            cor_matrixs[i] = np.abs(init_scores[i]) >= score_thresh
+            cor_matrixs[i] = np.abs(init_scores[i]) >= score_thresh[i]
         intr_counts[i] = np.count_nonzero(cor_matrixs[i])
         true_posits[i] = np.count_nonzero(np.multiply(cor_matrixs[i], y))
         precisions[i] = true_posits[i] / intr_counts[i]
@@ -172,13 +247,16 @@ def predict_and_compare(x: np.ndarray,
         np.save(results_dir_path + 'precisions.npy', precisions)
         np.save(results_dir_path + 'recalls.npy', recalls)
 
-        p_counts = np.empty(10, dtype=np.int_)
-        for i in range(10):
-            p_counts[i] = np.count_nonzero(p_values[0] < (i + 1) / 10)
-        for i in range(10 - 1, 0, -1):
-            p_counts[i] -= p_counts[i - 1]
-        np.save(results_dir_path + 'p_counts.npy', p_counts)
-        np.savetxt(results_dir_path + 'p_counts.txt', p_counts, fmt='%d')
+        if perm_num:
+            p_counts = np.empty(10, dtype=np.int_)
+            for i in range(10):
+                p_counts[i] = np.count_nonzero(p_values[0] < (i + 1) / 10)
+            for i in range(10 - 1, 0, -1):
+                p_counts[i] -= p_counts[i - 1]
+
+            np.save(results_dir_path + 'p_values.npy', p_values[0])
+            np.save(results_dir_path + 'p_counts.npy', p_counts)
+            np.savetxt(results_dir_path + 'p_counts.txt', p_counts, fmt='%d')
 
         save_dense_to_interactions(cor_matrixs[0],
                                    results_dir_path + 'interactions.csv')
@@ -186,12 +264,14 @@ def predict_and_compare(x: np.ndarray,
 
 if __name__ == '__main__':
     torch_data = get_dataset(smpl_path, intr_path, feature_size)
+    # torch_data = get_dataset(smpl_path)
     # torch_data = get_cora_dataset(train=False)
 
     x = np.asarray(torch_data.x)
     edge_index = np.asarray(torch_data.edge_index)
     y = coo_matrix((np.ones(edge_index.shape[1]), edge_index),
                    (x.shape[0], x.shape[0])).todense()
+    node_names = torch_data.node_names
 
     model = Model(feature_size, 256, 256)
     if is_use_gpu:
@@ -199,11 +279,17 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(model_path))
     model.eval()
 
-    x_tmp = x[:200].copy()
-    y_tmp = y[:200, :200].copy()
-    predict_and_compare(x_tmp,
-                        y_tmp,
-                        methods=(sne, pcc, spm),
-                        score_thresh=0.8,
-                        p_val_thresh=0.1,
-                        perm_num=100)
+    # x = x[:300].copy()
+    # y = y[:300, :300].copy()
+    # x = np.apply_along_axis(np.random.permutation, axis=1, arr=x)
+
+    # predict(x, score_thresh=0.8, p_val_thresh=0.05, perm_num=200)
+
+    predict_and_compare(
+        x,
+        y,
+        methods=(sne, pcc, spm),
+        score_thresh=(0.0, 0.4, 0.4),
+        # score_thresh=(0.8, 0.8, 0.8),
+        p_val_thresh=0.05,
+        perm_num=100)
