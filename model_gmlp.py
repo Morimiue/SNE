@@ -45,8 +45,8 @@ class GMLPModel(nn.Module):
         x = self.dp(x)
         x = self.linear2(x)
 
-        # return x, self._get_z_sim(x)
         if self.training:
             return x, self._get_z_dist_triu(x)
         else:
-            return x, self._get_z_dist(x)
+            return x
+            # return x, self._get_z_dist(x)
